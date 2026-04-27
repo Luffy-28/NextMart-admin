@@ -3,6 +3,8 @@ import cors from "cors";
 import mongoose from "mongoose";
 import { configDotenv } from "dotenv";
 import { config } from "./src/config/config.js";
+import authRouter from "./src/routers/authRouter.js";
+import userRouter from "./src/routers/userRouter.js";
 configDotenv();
 
 const app = express();
@@ -18,6 +20,9 @@ app.get("/", (req, res) => {
     message: "Welcome to NextMart Admin API",
   });
 });
+
+app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/users", userRouter);
 
 mongoose.connect(mongourl).then(() => {
   console.log("Connected to MongoDB");
