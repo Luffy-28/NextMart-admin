@@ -5,12 +5,18 @@ import { configDotenv } from "dotenv";
 import { config } from "./src/config/config.js";
 import authRouter from "./src/routers/authRouter.js";
 import userRouter from "./src/routers/userRouter.js";
+import helmet from "helmet";
+import morgan from "morgan";
+import { connectRedis } from "./src/helpers/redisClient.js";
+
 configDotenv();
 
 const app = express();
 const port = config.port;
 const mongourl = config.mongoUrl;
 
+app.use(helmet());
+app.use(morgan("dev"));
 app.use(cors());
 app.use(express.json());
 
@@ -24,13 +30,24 @@ app.get("/", (req, res) => {
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
 
-mongoose.connect(mongourl).then(() => {
-  console.log("Connected to MongoDB");
-  app.listen(port, (error) => {
-    if (error) {
-      console.log("Error starting server:", error);
-    } else {
-      console.log(`server started at port ${port}`);
-    }
-  });
-});
+const startServer = async () => {
+  try {
+    await mongoose.connect(mongourl);
+    console.log("Connected to MongoDB");
+
+    await connectRedis();
+
+    app.listen(port, (error) => {
+      if (error) {
+        console.log("Error starting server:", error);
+      } else {
+        console.log(`Server started at port ${port}`);
+      }
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+};
+
+startServer();

@@ -3,14 +3,19 @@ import { User } from "../models/userModel.js";
 
 export const authMiddleware = async (req, res, next) => {
   try {
-    const token = req.headers.authorization;
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).send({ status: "error", message: "No token" });
+    }
+    const token = authHeader.split(" ")[1];
+
     if (token) {
       const tokenData = verifyToken(token);
 
       const user = await User.findOne({ email: tokenData.email });
+      const {password, ...safeUser} = user.toObject();
       if (user) {
-        user.password = "";
-        req.user = user;
+        req.user = safeUser;
         next();
       } else {
         return res.status(401).send({
