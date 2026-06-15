@@ -1,6 +1,6 @@
 import { compareData, hashPassword } from "../helpers/encryptHelper.js";
 import { signToken } from "../helpers/tokenHelper.js";
-import { User } from "../models/adminUserModel.js";
+import { Admin } from "../models/adminUserModel.js";
 
 // login User
 export const loginUser = async (req, res) => {
@@ -12,7 +12,7 @@ export const loginUser = async (req, res) => {
         message: "Please provide email and password",
       });
     }
-    const userData = await User.findOne({ email });
+    const userData = await Admin.findOne({ email });
     if (userData) {
       const isMatched = compareData(password, userData.password);
       if (isMatched) {

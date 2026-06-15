@@ -1,5 +1,5 @@
 import { verifyToken } from "../helpers/tokenHelper.js";
-import { User } from "../models/userModel.js";
+import { Admin } from "../models/adminUserModel.js";
 
 export const authMiddleware = async (req, res, next) => {
   try {
@@ -12,7 +12,7 @@ export const authMiddleware = async (req, res, next) => {
     if (token) {
       const tokenData = verifyToken(token);
 
-      const user = await User.findOne({ email: tokenData.email });
+      const user = await Admin.findOne({ email: tokenData.email });
       const {password, ...safeUser} = user.toObject();
       if (user) {
         req.user = safeUser;
