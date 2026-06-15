@@ -1,6 +1,6 @@
 import { compareData, hashPassword } from "../helpers/encryptHelper.js";
 import { signToken } from "../helpers/tokenHelper.js";
-import { User } from "../models/userModel.js";
+import { User } from "../models/adminUserModel.js";
 
 // login User
 export const loginUser = async (req, res) => {

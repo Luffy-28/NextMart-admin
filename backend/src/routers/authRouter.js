@@ -1,5 +1,5 @@
 import express from "express";
-import { loginUser } from "../controllers/userController.js";
+import { loginUser } from "../controllers/authController.js";
 import { authLimiter } from "../middlewares/rateLimiter.js";
 import { loginAdminValidator } from "../middlewares/requestValidator.js";
 
