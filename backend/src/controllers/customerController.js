@@ -1,5 +1,6 @@
 import { Address } from "../models/addressModel";
 import { User } from "../models/userModel.js";
+import {Order} from "../models/orderModel.js"
 
 //get all the customers
 export const getAllCustomers = async(req, res) =>{
@@ -96,17 +97,106 @@ export const getUserDetials = async(req,res) =>{
 
 
 
-
-
 // update customer status like block unblock
+export const updateCustomerStat = async(req, res) =>{
+   try {
+    const {status, reason} = req.body;
+    const userId = req.params;
 
+    if(!status || !reason || !userId){
+        return res.status(400).send({
+            status:"error",
+            message:"Please provide status, reason and user id",
+        })
+    }
+    const updateUser = await User.findByIdAndUpdate(userId, {status, reason},{new: true})
+    if(!updatedUser){
+        return res.status(404).send({
+            status:"error",
+            message:"user not found"
+        })
+    }
+return res.status(200).send({
+    status:"success",
+    message:"customer status updated successfully",
+    data:updatedUser
+})
+
+   } catch (error) {
+    console.log(error);
+        return res.status(500).send({
+            status:"error",
+            message:"erro updating status"
+        })
+   }
+}
 
 
 
 
 // get cutomer Orders
 
+export const getOrderByUser = async(req,res) =>{
+    try {
+        const userId = req.params.id;
+        if(!userId){
+            return res.status(400).send({
+                status:"error",
+                message:"Please provide user id"
+            })
+        }
+        const order = await Order.find({user: userId}).populate("userId","name email phoneNumber").populate("addressId", "name mobile").populate("paymentId", "paymentMethod paymentStatus").populate("items.product", "name description image")
+        if(!order){
+            return res.status(404).send({
+                status:"error",
+                message:"Order not found"
+            })
+        }
+        return res.status(200).send({
+            status:"success",
+            message:"Order fetched successfully",
+            data:order
+        })
+    } catch (error) {
+        console.log(error);
+        return res.status(500).send({
+            status:"error",
+            message:"error fetching orders"
+        })
+    }
+}
+
 
 
 // get cutomer Order Details with :id
+export const getOrderDetails = async(req,res) =>{
+    try {
+        const orderId = req.params.id;
+        if(!orderId){
+            return res.status(400).send({
+                status:"error",
+                message:"Please provide order id",
+            })
+        }
+        const order = await Order.findById(orderId).populate("userId", "name email").populate("addressId", "name mobile").populate("paymentId", "paymentMethod paymentStatus").populate("items.product", "name description image")
+        if(!order){
+            return res.status(404).send({
+                status:"error",
+                message:"Order not found"
+            })
+        }
+        return res.status(200).send({
+            status:"success",
+            message:"Order details fetched successfully",
+            data:order
+        })
+    } catch (error) {
+        console.log(error);
+        return res.status(500).send({
+            status:"error",
+            message:"error fetching order details"
+        })
+    }
+}
+
 

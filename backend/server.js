@@ -8,6 +8,7 @@ import userRouter from "./src/routers/userRouter.js";
 import helmet from "helmet";
 import morgan from "morgan";
 import { connectRedis } from "./src/helpers/redisClient.js";
+import customerManagementRouter from "./src/routers/customerManagementRouter.js";
 
 configDotenv();
 
@@ -29,6 +30,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
+app.use("api/v1/customers", customerManagementRouter)
 
 const startServer = async () => {
   try {
