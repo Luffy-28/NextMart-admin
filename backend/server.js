@@ -10,6 +10,7 @@ import morgan from "morgan";
 import { connectRedis } from "./src/helpers/redisClient.js";
 import customerManagementRouter from "./src/routers/customerManagementRouter.js";
 import categoryManagementRouter from "./src/routers/categoryManagementRouter.js";
+import productManagementRouter from "./src/routers/productManagementRouter.js";
 configDotenv();
 
 const app = express();
@@ -32,6 +33,7 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
 app.use("api/v1/customers", customerManagementRouter)
 app.use("api/v1/category", categoryManagementRouter)
+app.use("api/v1/products", productManagementRouter)
 
 const startServer = async () => {
   try {
