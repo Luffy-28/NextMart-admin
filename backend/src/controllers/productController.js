@@ -1,20 +1,4 @@
 import { Product } from "../models/productModel.js";
-import { createEmbedding,  } from "../helpers/geminaiHelper.js";
-
-
-
-export const getProductTextForEmbedding = (product) => `
-Name: ${product.name}
-Brand: ${product.brand || ""}
-Category: ${product.category || ""}
-Subcategory: ${product.subCategory || ""}
-Description: ${product.description || ""}
-Tags: ${product.tags?.join(", ") || ""}
-Color: ${product.color || ""}
-Size: ${product.size || ""}
-Price: ${product.discountedPrice || product.basePrice}
-Rating: ${product.rating || 0}
-`;
 
 // Get all products
 export const getAllProduct = async(req, res) =>{
@@ -59,19 +43,13 @@ export const getAllProduct = async(req, res) =>{
 // create new products
 export const createNewProduct = async(req,res) =>{
     try {
-        const productData = req.body;
+        const {productData} = req.body;
         if(!productData){
             return res.status(400).send({
                 status:"error",
                 message:"productData is required",
                 
             })  
-        }
-        // generate embedding for the product
-        const bookText = getProductTextForEmbedding(productData);
-        const embedding = await createEmbedding(bookText);
-        if(embedding){
-            productData.embedding = embedding;
         }
         const product = await Product.insertOne(productData);
         if(!product){
@@ -132,25 +110,12 @@ export const getProductById = async(req,res) =>{
 export const updateProduct = async(req,res) =>{
     try {
         const {productId} = req.params;
-        const updatedData = req.body;
+        const {updatedData} = req.body;
         if(!productId || !updatedData){
             return res.status(400).send({
                 status:"error",
                 message:"provide a product id and updated data"
             })
-        }
-        const oldProduct = await Product.findById(productId);
-        if(!oldProduct){
-            return res.status(404).send({
-                status:"error",
-                message:"product not found",
-            })
-        }
-        const mergedBook = {...oldProduct.toObject(), ...updatedData};
-        const bookText  = getProductTextForEmbedding(mergedBook);
-        const embedding = await createEmbedding(bookText);
-        if(embedding){
-            updatedData.embedding = embedding;
         }
     const updatedProduct = await Product.findByIdAndUpdate(productId,updatedData, {new: true});
         if(!updatedProduct){
