@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: '/orders',     label: 'Orders & Payments',   icon: 'payments' },
   { to: '/reviews',    label: 'Review Moderation',   icon: 'rate_review' },
   { to: '/deals',      label: 'Deals Management',    icon: 'sell' },
+  { to: '/refunds',    label: 'Refund Approvals',    icon: 'assignment_return' },
 ];
 
 const Sidebar = () => {

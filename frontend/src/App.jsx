@@ -7,6 +7,7 @@ import Products from './pages/Products';
 import Orders from './pages/Orders';
 import Reviews from './pages/Reviews';
 import Deals from './pages/Deals';
+import Refunds from './pages/Refunds';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/orders" element={<Orders />} />
           <Route path="/reviews" element={<Reviews />} />
           <Route path="/deals" element={<Deals />} />
+          <Route path="/refunds" element={<Refunds />} />
         </Route>
         
         {/* Wildcard Fallback redirection */}

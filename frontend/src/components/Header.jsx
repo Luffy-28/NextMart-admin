@@ -7,6 +7,7 @@ const ROUTE_META = {
   '/orders':    { title: 'Orders & Payments',         placeholder: 'Search order IDs, customers or emails...' },
   '/reviews':   { title: 'Review Moderation',         placeholder: 'Search reviews, users, or products...' },
   '/deals':     { title: 'Deals Management',          placeholder: 'Search coupons or campaign names...' },
+  '/refunds':   { title: 'Refund Approvals',          placeholder: 'Search refund IDs, orders, or reasons...' },
 };
 
 const Header = () => {
