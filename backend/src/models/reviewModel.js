@@ -29,6 +29,11 @@ const reviewSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    isApproved: {
+      type: String,
+      enum: ["pending","approved","rejected"],
+      default: "pending",
+    },
 
     images: [{ type: String }],
   },

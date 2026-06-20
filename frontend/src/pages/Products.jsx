@@ -1,0 +1,840 @@
+import React, { useState, useRef } from 'react';
+import DataTable from '../components/ui/DataTable';
+import StatusBadge from '../components/ui/StatusBadge';
+import Modal from '../components/ui/Modal';
+
+/* ─────────────────────────────────────────────────────────────
+   STATIC MOCK DATA  (matches backend schema exactly)
+   Product: name, description, category, subCategory, brand,
+            basePrice, discountedPrice, stock, color, size,
+            features[], specifications[{label,value}], tags[],
+            images[], featured, isActive, rating, reviewCount,
+            metaTitle, metaDescription
+   Category: name, slug, image, isActive
+   SubCategory: name, slug, image, category (ref), isActive
+───────────────────────────────────────────────────────────────*/
+const INIT_CATS = [
+  { id: 'cat1', name: 'Footwear',    slug: 'footwear',    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=80&h=80&fit=crop', isActive: true },
+  { id: 'cat2', name: 'Electronics', slug: 'electronics', image: 'https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=80&h=80&fit=crop', isActive: true },
+  { id: 'cat3', name: 'Apparel',     slug: 'apparel',     image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=80&h=80&fit=crop', isActive: true },
+];
+
+const INIT_SUBCATS = [
+  { id: 'sc1', name: 'Running',      slug: 'running',      category: 'cat1', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=60&h=60&fit=crop', isActive: true },
+  { id: 'sc2', name: 'Sneakers',     slug: 'sneakers',     category: 'cat1', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=60&h=60&fit=crop', isActive: true },
+  { id: 'sc3', name: 'Smartwatches', slug: 'smartwatches', category: 'cat2', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=60&h=60&fit=crop', isActive: true },
+  { id: 'sc4', name: 'Earbuds',      slug: 'earbuds',      category: 'cat2', image: 'https://images.unsplash.com/photo-1606220838315-056192d5e927?w=60&h=60&fit=crop', isActive: true },
+  { id: 'sc5', name: 'Hoodies',      slug: 'hoodies',      category: 'cat3', image: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=60&h=60&fit=crop', isActive: true },
+  { id: 'sc6', name: 'Compression',  slug: 'compression',  category: 'cat3', image: 'https://images.unsplash.com/photo-1512146172765-3fb9d7ab6b8b?w=60&h=60&fit=crop', isActive: true },
+];
+
+const INIT_PRODUCTS = [
+  {
+    id: 'p1', name: 'Vapor Ultra Running Shoes', slug: 'vapor-ultra-running-shoes',
+    description: 'Premium running shoes with ultra-light foam sole and breathable mesh upper.',
+    category: 'cat1', subCategory: 'sc1', brand: 'VaporX', color: 'Black', size: '10',
+    basePrice: 149.99, discountedPrice: 129.99, stock: 45,
+    features: ['Ultra-light foam', 'Mesh upper', 'Reflective trim'],
+    specifications: [{ label: 'Weight', value: '220g' }, { label: 'Drop', value: '8mm' }],
+    tags: ['running', 'athletic', 'lightweight'],
+    images: ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=160&h=160&fit=crop'],
+    featured: true, isActive: true, rating: 4.5, reviewCount: 128,
+    metaTitle: 'Vapor Ultra Running Shoes', metaDescription: 'Buy Vapor Ultra Running Shoes',
+  },
+  {
+    id: 'p2', name: 'Chronos Smartwatch Gen 5', slug: 'chronos-smartwatch-gen-5',
+    description: 'Next-gen smartwatch with health tracking, GPS, and 7-day battery life.',
+    category: 'cat2', subCategory: 'sc3', brand: 'Chronos', color: 'Space Gray', size: '44mm',
+    basePrice: 299.00, discountedPrice: null, stock: 18,
+    features: ['GPS tracking', 'Heart rate monitor', '7-day battery'],
+    specifications: [{ label: 'Display', value: 'AMOLED 1.4"' }, { label: 'Water Resistance', value: '5 ATM' }],
+    tags: ['smartwatch', 'wearable', 'fitness'],
+    images: ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=160&h=160&fit=crop'],
+    featured: false, isActive: true, rating: 4.2, reviewCount: 67,
+    metaTitle: 'Chronos Smartwatch Gen 5', metaDescription: 'Buy Chronos Smartwatch Gen 5',
+  },
+  {
+    id: 'p3', name: 'AeroDry Hoodie Pro', slug: 'aerodry-hoodie-pro',
+    description: 'Moisture-wicking athletic hoodie built for training in all conditions.',
+    category: 'cat3', subCategory: 'sc5', brand: 'AeroDry', color: 'Charcoal', size: 'L',
+    basePrice: 79.99, discountedPrice: 64.99, stock: 32,
+    features: ['Quick-dry fabric', 'Kangaroo pocket', 'Fleece-lined'],
+    specifications: [{ label: 'Material', value: '90% Polyester, 10% Spandex' }, { label: 'Fit', value: 'Athletic Fit' }],
+    tags: ['hoodie', 'training', 'moisture-wicking'],
+    images: ['https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=160&h=160&fit=crop'],
+    featured: false, isActive: true, rating: 3.8, reviewCount: 34,
+    metaTitle: 'AeroDry Hoodie Pro', metaDescription: 'Buy AeroDry Hoodie Pro',
+  },
+  {
+    id: 'p4', name: 'Apex Bluetooth Earbuds', slug: 'apex-bluetooth-earbuds',
+    description: 'True wireless earbuds with active noise cancellation and 30-hour playback.',
+    category: 'cat2', subCategory: 'sc4', brand: 'Apex', color: 'White', size: null,
+    basePrice: 119.50, discountedPrice: null, stock: 0,
+    features: ['ANC', '30h battery', 'IPX5 water resistant'],
+    specifications: [{ label: 'Driver', value: '10mm Dynamic' }, { label: 'Codec', value: 'AAC, SBC' }],
+    tags: ['earbuds', 'wireless', 'anc'],
+    images: ['https://images.unsplash.com/photo-1606220838315-056192d5e927?w=160&h=160&fit=crop'],
+    featured: false, isActive: false, rating: 4.0, reviewCount: 21,
+    metaTitle: 'Apex Bluetooth Earbuds', metaDescription: 'Buy Apex Bluetooth Earbuds',
+  },
+];
+
+/* ─── Blank form matching schema ─────────────────────────────*/
+const BLANK = {
+  name: '', description: '',
+  category: '', subCategory: '',
+  brand: '', color: '', size: '',
+  basePrice: '', discountedPrice: '',
+  stock: '',
+  features: [],
+  specifications: [],
+  tags: [],
+  images: [],
+  featured: false,
+  isActive: true,
+  metaTitle: '', metaDescription: '',
+};
+
+/* ─── Image picker ──────────────────────────────────────────── */
+const ImagePicker = ({ value, onChange, size = 80, label = 'Image' }) => {
+  const ref = useRef();
+  const handleFile = (e) => {
+    const f = e.target.files[0];
+    if (f) onChange(URL.createObjectURL(f));
+  };
+  return (
+    <div>
+      <label className="nm-label">{label}</label>
+      <div className="d-flex align-items-center gap-3">
+        <div
+          onClick={() => ref.current.click()}
+          style={{
+            width: size, height: size, borderRadius: 8, cursor: 'pointer',
+            border: '2px dashed var(--outline-variant)',
+            background: 'var(--surface-container-low)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden', flexShrink: 0,
+          }}
+          title="Click to upload"
+        >
+          {value
+            ? <img src={value} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <span className="material-symbols-outlined" style={{ color: 'var(--outline)', fontSize: 26 }}>add_photo_alternate</span>
+          }
+        </div>
+        <div>
+          <button type="button" className="nm-btn nm-btn-secondary nm-btn-sm" onClick={() => ref.current.click()}>
+            <span className="material-symbols-outlined">upload</span>
+            {value ? 'Change' : 'Upload'}
+          </button>
+          {value && (
+            <button type="button" className="nm-btn nm-btn-ghost nm-btn-sm ms-1" onClick={() => onChange('')}>
+              <span className="material-symbols-outlined" style={{ color: 'var(--error)', fontSize: 18 }}>delete</span>
+            </button>
+          )}
+        </div>
+      </div>
+      <input ref={ref} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+    </div>
+  );
+};
+
+/* ─── Collapsible Category Row ──────────────────────────────── */
+const CategoryRow = ({ cat, subCats, onEditCat, onDeleteCat, onEditSub, onDeleteSub, onAddSub }) => {
+  const [open, setOpen] = useState(false);
+  const mySubs = subCats.filter(s => s.category === cat.id);
+
+  return (
+    <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
+      {/* Header — click to collapse/expand */}
+      <div
+        className="d-flex align-items-center justify-content-between px-3 py-2"
+        style={{ background: 'var(--surface-container-low)', cursor: 'pointer', userSelect: 'none' }}
+        onClick={() => setOpen(o => !o)}
+      >
+        <div className="d-flex align-items-center gap-3">
+          {/* Expand chevron */}
+          <span className="material-symbols-outlined" style={{
+            fontSize: 18, color: 'var(--secondary)',
+            transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s',
+          }}>chevron_right</span>
+
+          {/* Category image */}
+          <div style={{ width: 38, height: 38, borderRadius: 7, overflow: 'hidden', flexShrink: 0, border: '1px solid var(--outline-variant)' }}>
+            {cat.image
+              ? <img src={cat.image} alt={cat.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <div style={{ width: '100%', height: '100%', background: 'var(--surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--secondary)' }}>folder</span>
+                </div>
+            }
+          </div>
+
+          <div>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>{cat.name}</span>
+            <span className="nm-badge nm-badge-default ms-2">{mySubs.length} sub</span>
+            {!cat.isActive && <span className="nm-badge nm-badge-danger ms-1">Inactive</span>}
+          </div>
+        </div>
+
+        {/* Actions — stop propagation so click doesn't toggle */}
+        <div className="d-flex gap-1" onClick={e => e.stopPropagation()}>
+          <button className="nm-action-btn" title="Add Sub-Category" onClick={() => onAddSub(cat)}>
+            <span className="material-symbols-outlined">add</span>
+          </button>
+          <button className="nm-action-btn" title="Edit" onClick={() => onEditCat(cat)}>
+            <span className="material-symbols-outlined">edit</span>
+          </button>
+          <button className="nm-action-btn danger" title="Delete" onClick={() => onDeleteCat(cat.id)}>
+            <span className="material-symbols-outlined">delete</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Collapsible Sub-categories */}
+      {open && (
+        <div style={{ padding: '12px 16px', background: 'var(--surface-container-lowest)', display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {mySubs.length === 0 && (
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--secondary)', fontStyle: 'italic' }}>
+              No sub-categories yet. Click <strong>+</strong> to add one.
+            </p>
+          )}
+          {mySubs.map(sub => (
+            <div key={sub.id} style={{
+              border: '1px solid var(--outline-variant)', borderRadius: 8, padding: '8px 12px',
+              display: 'flex', alignItems: 'center', gap: 10, background: 'white',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            }}>
+              <div style={{ width: 30, height: 30, borderRadius: 6, overflow: 'hidden', flexShrink: 0, border: '1px solid var(--outline-variant)' }}>
+                {sub.image
+                  ? <img src={sub.image} alt={sub.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <div style={{ width: '100%', height: '100%', background: 'var(--surface-container-low)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--secondary)' }}>folder_open</span>
+                    </div>
+                }
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{sub.name}</span>
+              {!sub.isActive && <span className="nm-badge nm-badge-danger" style={{ fontSize: 9 }}>off</span>}
+              <button className="nm-action-btn" title="Edit" style={{ width: 24, height: 24 }} onClick={() => onEditSub(sub)}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+              </button>
+              <button className="nm-action-btn danger" title="Delete" style={{ width: 24, height: 24 }} onClick={() => onDeleteSub(sub.id)}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─── Product Form (multi-tab) ──────────────────────────────── */
+const TABS = ['Basic Info', 'Details', 'Images', 'SEO'];
+
+const ProductForm = ({ form, setForm, cats, subCats }) => {
+  const [tab, setTab] = useState('Basic Info');
+  const [featureInput, setFeatureInput] = useState('');
+  const [tagInput, setTagInput]         = useState('');
+  const [specInput, setSpecInput]       = useState({ label: '', value: '' });
+  const imageRef = useRef();
+
+  const set = (field, value) => setForm(f => ({ ...f, [field]: value }));
+
+  const filteredSubs = subCats.filter(s => s.category === form.category);
+
+  const addFeature = () => {
+    if (!featureInput.trim()) return;
+    set('features', [...(form.features || []), featureInput.trim()]);
+    setFeatureInput('');
+  };
+  const removeFeature = (i) => set('features', form.features.filter((_, idx) => idx !== i));
+
+  const addSpec = () => {
+    if (!specInput.label.trim() || !specInput.value.trim()) return;
+    set('specifications', [...(form.specifications || []), { ...specInput }]);
+    setSpecInput({ label: '', value: '' });
+  };
+  const removeSpec = (i) => set('specifications', form.specifications.filter((_, idx) => idx !== i));
+
+  const addTag = () => {
+    if (!tagInput.trim()) return;
+    set('tags', [...(form.tags || []), tagInput.trim().toLowerCase()]);
+    setTagInput('');
+  };
+  const removeTag = (i) => set('tags', form.tags.filter((_, idx) => idx !== i));
+
+  const addImage = (url) => {
+    if (url) set('images', [...(form.images || []), url]);
+  };
+  const removeImage = (i) => set('images', form.images.filter((_, idx) => idx !== i));
+
+  const handleImageFile = (e) => {
+    const f = e.target.files[0];
+    if (f) addImage(URL.createObjectURL(f));
+    e.target.value = '';
+  };
+
+  return (
+    <div>
+      {/* Tabs */}
+      <div className="nm-tabs mb-4">
+        {TABS.map(t => (
+          <button key={t} className={`nm-tab-btn${tab === t ? ' active' : ''}`} type="button" onClick={() => setTab(t)}>{t}</button>
+        ))}
+      </div>
+
+      {/* ── Basic Info ── */}
+      {tab === 'Basic Info' && (
+        <div className="row g-3">
+          <div className="col-12">
+            <label className="nm-label">Product Name *</label>
+            <input className="nm-input" placeholder="e.g. Vapor Ultra Running Shoes" value={form.name}
+              onChange={e => set('name', e.target.value)} required />
+          </div>
+          <div className="col-12">
+            <label className="nm-label">Description *</label>
+            <textarea className="nm-input" rows={3} placeholder="Full product description…" value={form.description}
+              onChange={e => set('description', e.target.value)} style={{ resize: 'vertical' }} required />
+          </div>
+          <div className="col-md-6">
+            <label className="nm-label">Category *</label>
+            <select className="nm-select" value={form.category}
+              onChange={e => { set('category', e.target.value); set('subCategory', ''); }} required>
+              <option value="">Select category…</option>
+              {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="col-md-6">
+            <label className="nm-label">Sub-Category <span style={{ opacity: 0.5, fontWeight: 400 }}>(optional)</span></label>
+            <select className="nm-select" value={form.subCategory || ''} onChange={e => set('subCategory', e.target.value)}
+              disabled={!form.category}>
+              <option value="">None</option>
+              {filteredSubs.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div className="col-md-6">
+            <label className="nm-label">Base Price ($) *</label>
+            <input className="nm-input" type="number" step="0.01" min="0" placeholder="0.00" value={form.basePrice}
+              onChange={e => set('basePrice', e.target.value)} required />
+          </div>
+          <div className="col-md-6">
+            <label className="nm-label">Discounted Price ($) <span style={{ opacity: 0.5, fontWeight: 400 }}>(optional)</span></label>
+            <input className="nm-input" type="number" step="0.01" min="0" placeholder="Leave blank for no discount" value={form.discountedPrice || ''}
+              onChange={e => set('discountedPrice', e.target.value || null)} />
+          </div>
+          <div className="col-md-4">
+            <label className="nm-label">Stock *</label>
+            <input className="nm-input" type="number" min="0" placeholder="0" value={form.stock}
+              onChange={e => set('stock', e.target.value)} required />
+          </div>
+          <div className="col-md-4">
+            <label className="nm-label">Brand</label>
+            <input className="nm-input" placeholder="e.g. Nike, Apple…" value={form.brand || ''}
+              onChange={e => set('brand', e.target.value)} />
+          </div>
+          <div className="col-md-2">
+            <label className="nm-label">Color</label>
+            <input className="nm-input" placeholder="e.g. Black" value={form.color || ''}
+              onChange={e => set('color', e.target.value)} />
+          </div>
+          <div className="col-md-2">
+            <label className="nm-label">Size</label>
+            <input className="nm-input" placeholder="e.g. 10" value={form.size || ''}
+              onChange={e => set('size', e.target.value)} />
+          </div>
+
+          {/* Toggles */}
+          <div className="col-12 d-flex gap-4">
+            <label className="d-flex align-items-center gap-2" style={{ cursor: 'pointer', fontSize: 14 }}>
+              <input type="checkbox" checked={!!form.isActive} onChange={e => set('isActive', e.target.checked)} />
+              <span style={{ fontWeight: 600 }}>Active <span style={{ color: 'var(--secondary)', fontWeight: 400 }}>(visible to customers)</span></span>
+            </label>
+            <label className="d-flex align-items-center gap-2" style={{ cursor: 'pointer', fontSize: 14 }}>
+              <input type="checkbox" checked={!!form.featured} onChange={e => set('featured', e.target.checked)} />
+              <span style={{ fontWeight: 600 }}>Featured <span style={{ color: 'var(--secondary)', fontWeight: 400 }}>(show on homepage)</span></span>
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* ── Details ── */}
+      {tab === 'Details' && (
+        <div className="row g-4">
+          {/* Features */}
+          <div className="col-12">
+            <label className="nm-label">Key Features</label>
+            <div className="d-flex gap-2 mb-2">
+              <input className="nm-input" placeholder="e.g. Ultra-light foam" value={featureInput}
+                onChange={e => setFeatureInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addFeature())} />
+              <button type="button" className="nm-btn nm-btn-secondary" style={{ flexShrink: 0 }} onClick={addFeature}>
+                <span className="material-symbols-outlined">add</span>
+              </button>
+            </div>
+            <div className="d-flex flex-wrap gap-2">
+              {(form.features || []).map((f, i) => (
+                <span key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '4px 10px', background: 'var(--secondary-container)',
+                  borderRadius: 99, fontSize: 12, fontWeight: 600, color: 'var(--primary-container)'
+                }}>
+                  {f}
+                  <button type="button" onClick={() => removeFeature(i)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--secondary)' }}>close</span>
+                  </button>
+                </span>
+              ))}
+              {(form.features || []).length === 0 && <p style={{ margin: 0, fontSize: 12, color: 'var(--secondary)', fontStyle: 'italic' }}>No features added yet.</p>}
+            </div>
+          </div>
+
+          {/* Specifications */}
+          <div className="col-12">
+            <label className="nm-label">Specifications</label>
+            <div className="d-flex gap-2 mb-2">
+              <input className="nm-input" placeholder="Label (e.g. Weight)" value={specInput.label}
+                onChange={e => setSpecInput(s => ({ ...s, label: e.target.value }))} style={{ flex: 1 }} />
+              <input className="nm-input" placeholder="Value (e.g. 220g)" value={specInput.value}
+                onChange={e => setSpecInput(s => ({ ...s, value: e.target.value }))} style={{ flex: 1 }} />
+              <button type="button" className="nm-btn nm-btn-secondary" style={{ flexShrink: 0 }} onClick={addSpec}>
+                <span className="material-symbols-outlined">add</span>
+              </button>
+            </div>
+            <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 8, overflow: 'hidden' }}>
+              {(form.specifications || []).length === 0
+                ? <p style={{ margin: '14px 16px', fontSize: 12, color: 'var(--secondary)', fontStyle: 'italic' }}>No specifications added.</p>
+                : (form.specifications || []).map((sp, i) => (
+                  <div key={i} className="d-flex align-items-center" style={{
+                    borderBottom: i < form.specifications.length - 1 ? '1px solid var(--outline-variant)' : 'none'
+                  }}>
+                    <span style={{ flex: 1, padding: '8px 14px', fontSize: 13, fontWeight: 600, background: 'var(--surface-container-low)' }}>{sp.label}</span>
+                    <span style={{ flex: 2, padding: '8px 14px', fontSize: 13 }}>{sp.value}</span>
+                    <button type="button" className="nm-action-btn danger me-2" onClick={() => removeSpec(i)}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                    </button>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div className="col-12">
+            <label className="nm-label">Tags</label>
+            <div className="d-flex gap-2 mb-2">
+              <input className="nm-input" placeholder="e.g. running, athletic" value={tagInput}
+                onChange={e => setTagInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())} />
+              <button type="button" className="nm-btn nm-btn-secondary" style={{ flexShrink: 0 }} onClick={addTag}>
+                <span className="material-symbols-outlined">add</span>
+              </button>
+            </div>
+            <div className="d-flex flex-wrap gap-2">
+              {(form.tags || []).map((t, i) => (
+                <span key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '3px 10px', background: 'var(--surface-container)',
+                  borderRadius: 99, fontSize: 12, color: 'var(--on-surface-variant)',
+                  border: '1px solid var(--outline-variant)'
+                }}>
+                  #{t}
+                  <button type="button" onClick={() => removeTag(i)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 13, color: 'var(--secondary)' }}>close</span>
+                  </button>
+                </span>
+              ))}
+              {(form.tags || []).length === 0 && <p style={{ margin: 0, fontSize: 12, color: 'var(--secondary)', fontStyle: 'italic' }}>No tags yet.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Images ── */}
+      {tab === 'Images' && (
+        <div>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <label className="nm-label" style={{ margin: 0 }}>Product Images</label>
+            <button type="button" className="nm-btn nm-btn-secondary nm-btn-sm" onClick={() => imageRef.current.click()}>
+              <span className="material-symbols-outlined">add_photo_alternate</span>
+              Add Image
+            </button>
+          </div>
+          <input ref={imageRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageFile} />
+
+          {(form.images || []).length === 0 ? (
+            <div className="nm-empty-state" style={{ padding: '32px' }}>
+              <span className="material-symbols-outlined">photo_library</span>
+              <p style={{ margin: '8px 0 0', fontSize: 13 }}>No images uploaded yet. Click "Add Image" above.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
+              {(form.images || []).map((img, i) => (
+                <div key={i} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--outline-variant)', aspectRatio: '1' }}>
+                  <img src={img} alt={`product-${i}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {i === 0 && (
+                    <span style={{
+                      position: 'absolute', top: 6, left: 6,
+                      background: 'var(--primary-container)', color: '#fff',
+                      fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 99, textTransform: 'uppercase'
+                    }}>Main</span>
+                  )}
+                  <button type="button" onClick={() => removeImage(i)} style={{
+                    position: 'absolute', top: 4, right: 4,
+                    background: 'rgba(186,26,26,0.85)', border: 'none', borderRadius: '50%',
+                    width: 22, height: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: 13 }}>close</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SEO ── */}
+      {tab === 'SEO' && (
+        <div className="row g-3">
+          <div className="col-12">
+            <div style={{ padding: '12px 16px', background: 'var(--surface-container-low)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: 'var(--secondary)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, marginTop: 1 }}>info</span>
+              <span>Slug is auto-generated from the product name. These fields help search engines index your product page.</span>
+            </div>
+          </div>
+          <div className="col-12">
+            <label className="nm-label">Meta Title</label>
+            <input className="nm-input" placeholder="e.g. Buy Vapor Ultra Running Shoes | NextMart" value={form.metaTitle || ''}
+              onChange={e => set('metaTitle', e.target.value)} />
+            <span style={{ fontSize: 11, color: 'var(--secondary)', marginTop: 3, display: 'block' }}>{(form.metaTitle || '').length}/60 chars recommended</span>
+          </div>
+          <div className="col-12">
+            <label className="nm-label">Meta Description</label>
+            <textarea className="nm-input" rows={3} placeholder="A brief description for search results (150–160 chars)…" value={form.metaDescription || ''}
+              onChange={e => set('metaDescription', e.target.value)} style={{ resize: 'vertical' }} />
+            <span style={{ fontSize: 11, color: 'var(--secondary)', marginTop: 3, display: 'block' }}>{(form.metaDescription || '').length}/160 chars recommended</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─── Main Products Page ────────────────────────────────────── */
+const Products = () => {
+  const [products, setProducts] = useState(INIT_PRODUCTS);
+  const [cats, setCats]         = useState(INIT_CATS);
+  const [subCats, setSubCats]   = useState(INIT_SUBCATS);
+
+  const [productModal, setProductModal] = useState(null); // null | 'add' | 'edit'
+  const [editProduct, setEditProduct]   = useState(null);
+  const [productForm, setProductForm]   = useState(BLANK);
+
+  const [catModal, setCatModal]   = useState(null); // null | 'cat' | 'sub'
+  const [editCat, setEditCat]     = useState(null);
+  const [editSub, setEditSub]     = useState(null);
+  const [defaultParent, setDefaultParent] = useState(null);
+  const [catForm, setCatForm]   = useState({ name: '', image: '', isActive: true });
+  const [subForm, setSubForm]   = useState({ name: '', image: '', category: '', isActive: true });
+
+  /* ── Product CRUD ── */
+  const openAddProduct  = () => { setProductForm({ ...BLANK }); setEditProduct(null); setProductModal('add'); };
+  const openEditProduct = (p) => { setEditProduct(p); setProductForm({ ...p }); setProductModal('edit'); };
+  const closeProductModal = () => { setProductModal(null); setEditProduct(null); };
+
+  const saveProduct = (e) => {
+    e.preventDefault();
+    const data = {
+      ...productForm,
+      basePrice: parseFloat(productForm.basePrice) || 0,
+      discountedPrice: productForm.discountedPrice ? parseFloat(productForm.discountedPrice) : null,
+      stock: parseInt(productForm.stock, 10) || 0,
+      slug: productForm.name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-'),
+    };
+    if (productModal === 'add') {
+      setProducts(prev => [{ ...data, id: `p${Date.now()}`, rating: 0, reviewCount: 0 }, ...prev]);
+    } else {
+      setProducts(prev => prev.map(p => p.id === editProduct.id ? { ...p, ...data } : p));
+    }
+    closeProductModal();
+  };
+
+  const deleteProduct = (id) => {
+    if (window.confirm('Delete this product?')) setProducts(prev => prev.filter(p => p.id !== id));
+  };
+
+  /* ── Category CRUD ── */
+  const openAddCat  = () => { setCatForm({ name: '', image: '', isActive: true }); setEditCat(null); setCatModal('cat'); };
+  const openEditCat = (c) => { setCatForm({ name: c.name, image: c.image, isActive: c.isActive }); setEditCat(c); setCatModal('cat'); };
+  const saveCat = (e) => {
+    e.preventDefault();
+    if (editCat) {
+      setCats(prev => prev.map(c => c.id === editCat.id ? { ...c, ...catForm } : c));
+    } else {
+      setCats(prev => [...prev, { id: `cat${Date.now()}`, ...catForm, slug: catForm.name.toLowerCase().replace(/\s+/g, '-') }]);
+    }
+    setCatModal(null);
+  };
+  const deleteCat = (id) => {
+    if (!window.confirm('Delete category and its sub-categories?')) return;
+    setCats(prev => prev.filter(c => c.id !== id));
+    setSubCats(prev => prev.filter(s => s.category !== id));
+  };
+
+  /* ── Sub-category CRUD ── */
+  const openAddSub  = (parentCat) => {
+    setSubForm({ name: '', image: '', category: parentCat?.id || cats[0]?.id || '', isActive: true });
+    setDefaultParent(parentCat);
+    setEditSub(null);
+    setCatModal('sub');
+  };
+  const openEditSub = (s) => { setSubForm({ name: s.name, image: s.image, category: s.category, isActive: s.isActive }); setEditSub(s); setCatModal('sub'); };
+  const saveSub = (e) => {
+    e.preventDefault();
+    if (editSub) {
+      setSubCats(prev => prev.map(s => s.id === editSub.id ? { ...s, ...subForm } : s));
+    } else {
+      setSubCats(prev => [...prev, { id: `sc${Date.now()}`, ...subForm, slug: subForm.name.toLowerCase().replace(/\s+/g, '-') }]);
+    }
+    setCatModal(null);
+  };
+  const deleteSub = (id) => {
+    if (!window.confirm('Delete this sub-category?')) setSubCats(prev => prev.filter(s => s.id !== id));
+  };
+
+  /* ── Table columns ── */
+  const COLS = [
+    {
+      key: 'name', label: 'Product',
+      render: r => {
+        const cat = cats.find(c => c.id === r.category);
+        const sub = subCats.find(s => s.id === r.subCategory);
+        return (
+          <div className="d-flex align-items-center gap-3">
+            <div style={{
+              width: 52, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
+              border: '1px solid var(--outline-variant)', background: 'var(--surface-container-low)'
+            }}>
+              {(r.images && r.images[0])
+                ? <img src={r.images[0]} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span className="material-symbols-outlined" style={{ color: 'var(--secondary)', fontSize: 24 }}>inventory_2</span>
+                  </div>
+              }
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>{r.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--secondary)' }}>
+                {cat?.name}{sub ? ` › ${sub.name}` : ''}
+                {r.brand ? ` · ${r.brand}` : ''}
+              </div>
+              <div className="d-flex gap-1 mt-1 flex-wrap">
+                {r.featured && <span className="nm-badge nm-badge-purple">⭐ Featured</span>}
+                {r.tags?.slice(0, 2).map(t => (
+                  <span key={t} className="nm-badge nm-badge-default" style={{ fontSize: 9 }}>#{t}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'basePrice', label: 'Price',
+      render: r => (
+        <div>
+          {r.discountedPrice
+            ? <>
+                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--primary-container)' }}>${r.discountedPrice.toFixed(2)}</div>
+                <div style={{ fontSize: 12, color: 'var(--secondary)', textDecoration: 'line-through' }}>${r.basePrice.toFixed(2)}</div>
+              </>
+            : <strong>${r.basePrice.toFixed(2)}</strong>
+          }
+        </div>
+      )
+    },
+    {
+      key: 'stock', label: 'Stock',
+      render: r => r.stock === 0
+        ? <span style={{ color: 'var(--error)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>warning</span>Out of Stock
+          </span>
+        : <span style={{ fontWeight: 600 }}>{r.stock}</span>
+    },
+    {
+      key: 'rating', label: 'Rating',
+      render: r => (
+        <div className="d-flex align-items-center gap-1">
+          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#FACC15', fontVariationSettings: "'FILL' 1" }}>star</span>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>{r.rating.toFixed(1)}</span>
+          <span style={{ fontSize: 12, color: 'var(--secondary)' }}>({r.reviewCount})</span>
+        </div>
+      )
+    },
+    {
+      key: 'isActive', label: 'Status',
+      render: r => <StatusBadge status={r.isActive ? 'Active' : 'Inactive'} />
+    },
+    {
+      key: 'actions', label: 'Actions', sortable: false,
+      render: r => (
+        <div className="d-flex gap-1">
+          <button className="nm-action-btn" title="Edit product" onClick={() => openEditProduct(r)}>
+            <span className="material-symbols-outlined">edit</span>
+          </button>
+          <button className="nm-action-btn danger" title="Delete product" onClick={() => deleteProduct(r.id)}>
+            <span className="material-symbols-outlined">delete</span>
+          </button>
+        </div>
+      )
+    }
+  ];
+
+  return (
+    <div className="row g-4">
+      {/* ── LEFT: Product Table ──────────────────────────────── */}
+      <div className="col-12 col-xl-7">
+        <div className="nm-card nm-card-padding">
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h3 className="nm-page-section-title">Product Catalogue</h3>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--secondary)' }}>{products.length} products</p>
+            </div>
+            <button className="nm-btn nm-btn-primary" onClick={openAddProduct}>
+              <span className="material-symbols-outlined">add</span>
+              Add Product
+            </button>
+          </div>
+          <DataTable
+            columns={COLS}
+            data={products}
+            searchFields={['name', 'brand', 'description']}
+            placeholder="Search products, brands…"
+            pageSize={5}
+          />
+        </div>
+      </div>
+
+      {/* ── RIGHT: Category Panel ────────────────────────────── */}
+      <div className="col-12 col-xl-5">
+        <div className="nm-card nm-card-padding">
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h3 className="nm-page-section-title">Category Structure</h3>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--secondary)' }}>Click a row to expand sub-categories</p>
+            </div>
+            <button className="nm-btn nm-btn-primary nm-btn-sm" onClick={openAddCat}>
+              <span className="material-symbols-outlined">create_new_folder</span>
+              Add Category
+            </button>
+          </div>
+
+          {cats.map(cat => (
+            <CategoryRow
+              key={cat.id}
+              cat={cat}
+              subCats={subCats}
+              onEditCat={openEditCat}
+              onDeleteCat={deleteCat}
+              onEditSub={openEditSub}
+              onDeleteSub={deleteSub}
+              onAddSub={openAddSub}
+            />
+          ))}
+
+          {cats.length === 0 && (
+            <div className="nm-empty-state"><span className="material-symbols-outlined">folder_off</span><p>No categories yet.</p></div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Add/Edit Product Modal ── */}
+      <Modal
+        isOpen={!!productModal}
+        onClose={closeProductModal}
+        title={productModal === 'add' ? 'Add New Product' : `Edit — ${editProduct?.name}`}
+        size="lg"
+        footer={
+          <>
+            <button className="nm-btn nm-btn-secondary" onClick={closeProductModal}>Cancel</button>
+            <button className="nm-btn nm-btn-primary" form="product-form" type="submit">
+              {productModal === 'add' ? 'Save Product' : 'Update Product'}
+            </button>
+          </>
+        }
+      >
+        <form id="product-form" onSubmit={saveProduct}>
+          <ProductForm form={productForm} setForm={setProductForm} cats={cats} subCats={subCats} />
+        </form>
+      </Modal>
+
+      {/* ── Add/Edit Category Modal ── */}
+      <Modal
+        isOpen={catModal === 'cat'}
+        onClose={() => setCatModal(null)}
+        title={editCat ? 'Edit Category' : 'Add Category'}
+        size="sm"
+        footer={
+          <>
+            <button className="nm-btn nm-btn-secondary" onClick={() => setCatModal(null)}>Cancel</button>
+            <button className="nm-btn nm-btn-primary" form="cat-form" type="submit">
+              {editCat ? 'Save' : 'Create'}
+            </button>
+          </>
+        }
+      >
+        <form id="cat-form" onSubmit={saveCat} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label className="nm-label">Category Name *</label>
+            <input className="nm-input" placeholder="e.g. Footwear" value={catForm.name}
+              onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} required />
+          </div>
+          <ImagePicker value={catForm.image} onChange={v => setCatForm(f => ({ ...f, image: v }))} label="Category Image" size={72} />
+          <label className="d-flex align-items-center gap-2" style={{ cursor: 'pointer', fontSize: 14 }}>
+            <input type="checkbox" checked={catForm.isActive} onChange={e => setCatForm(f => ({ ...f, isActive: e.target.checked }))} />
+            <span style={{ fontWeight: 600 }}>Active</span>
+          </label>
+        </form>
+      </Modal>
+
+      {/* ── Add/Edit Sub-category Modal ── */}
+      <Modal
+        isOpen={catModal === 'sub'}
+        onClose={() => setCatModal(null)}
+        title={editSub ? 'Edit Sub-Category' : 'Add Sub-Category'}
+        size="sm"
+        footer={
+          <>
+            <button className="nm-btn nm-btn-secondary" onClick={() => setCatModal(null)}>Cancel</button>
+            <button className="nm-btn nm-btn-primary" form="sub-form" type="submit">
+              {editSub ? 'Save' : 'Create'}
+            </button>
+          </>
+        }
+      >
+        <form id="sub-form" onSubmit={saveSub} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label className="nm-label">Parent Category *</label>
+            <select className="nm-select" value={subForm.category}
+              onChange={e => setSubForm(f => ({ ...f, category: e.target.value }))} required>
+              <option value="">Select…</option>
+              {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="nm-label">Sub-Category Name *</label>
+            <input className="nm-input" placeholder="e.g. Running" value={subForm.name}
+              onChange={e => setSubForm(f => ({ ...f, name: e.target.value }))} required />
+          </div>
+          <ImagePicker value={subForm.image} onChange={v => setSubForm(f => ({ ...f, image: v }))} label="Sub-Category Image" size={60} />
+          <label className="d-flex align-items-center gap-2" style={{ cursor: 'pointer', fontSize: 14 }}>
+            <input type="checkbox" checked={subForm.isActive} onChange={e => setSubForm(f => ({ ...f, isActive: e.target.checked }))} />
+            <span style={{ fontWeight: 600 }}>Active</span>
+          </label>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+export default Products;

@@ -1,111 +1,899 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+
+/* ============================================================
+   STITCH DESIGN SYSTEM TOKENS — Executive Precision / NextMart
+   ============================================================ */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --surface:                  #f7f9fb;
+  --surface-dim:              #d8dadc;
+  --surface-bright:           #f7f9fb;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low:    #f2f4f6;
+  --surface-container:        #eceef0;
+  --surface-container-high:   #e6e8ea;
+  --surface-container-highest:#e0e3e5;
+  --on-surface:               #191c1e;
+  --on-surface-variant:       #45464d;
+  --inverse-surface:          #2d3133;
+  --inverse-on-surface:       #eff1f3;
+  --outline:                  #76777d;
+  --outline-variant:          #c6c6cd;
+  --primary:                  #000000;
+  --on-primary:               #ffffff;
+  --primary-container:        #131b2e;
+  --on-primary-container:     #7c839b;
+  --inverse-primary:          #bec6e0;
+  --secondary:                #505f76;
+  --on-secondary:             #ffffff;
+  --secondary-container:      #d0e1fb;
+  --on-secondary-container:   #54647a;
+  --secondary-fixed:          #d3e4fe;
+  --secondary-fixed-dim:      #b7c8e1;
+  --error:                    #ba1a1a;
+  --error-container:          #ffdad6;
+  --on-error-container:       #93000a;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Layout */
+  --sidebar-width:            280px;
+  --header-height:            64px;
+  --container-padding:        32px;
+  --gutter:                   24px;
+  --component-gap:            16px;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  /* Typography */
+  --font-sans:                'Inter', system-ui, sans-serif;
+  --font-mono:                'JetBrains Mono', ui-monospace, monospace;
+
+  /* Override Bootstrap primary */
+  --bs-primary:               var(--primary-container);
+  --bs-body-bg:               var(--surface);
+  --bs-body-font-family:      var(--font-sans);
+  --bs-body-color:            var(--on-surface);
+  --bs-border-color:          var(--outline-variant);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
+/* ============================================================
+   BASE RESETS
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
+  font-family: var(--font-sans);
+  background-color: var(--surface);
+  color: var(--on-surface);
   margin: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--outline-variant); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--outline); }
+
+/* ============================================================
+   LAYOUT SCAFFOLD
+   ============================================================ */
+.nm-app {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Sidebar */
+.nm-sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background-color: var(--primary-container);
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 100;
+  overflow-y: auto;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
+/* Content Area */
+.nm-content-area {
+  margin-left: var(--sidebar-width);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: calc(100vw - var(--sidebar-width));
+}
+
+/* Topbar */
+.nm-topbar {
+  height: var(--header-height);
+  background-color: var(--surface-container-lowest);
+  border-bottom: 1px solid var(--outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--gutter);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  gap: 16px;
+}
+
+/* Main Canvas */
+.nm-main {
+  padding: var(--container-padding);
+  flex: 1;
+  overflow-y: auto;
+  height: calc(100vh - var(--header-height));
+}
+
+/* ============================================================
+   SIDEBAR COMPONENTS
+   ============================================================ */
+.nm-brand {
+  padding: 28px 24px 20px;
+}
+
+.nm-brand-logo {
+  width: 40px;
+  height: 40px;
+  background-color: var(--secondary-fixed);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nm-brand-logo .material-symbols-outlined {
+  color: var(--primary-container);
+  font-size: 22px;
+}
+
+.nm-brand-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1;
+  letter-spacing: -0.3px;
+}
+
+.nm-brand-subtitle {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--on-primary-container);
+  font-weight: 600;
+  margin-top: 3px;
+  opacity: 0.7;
+}
+
+.nm-nav {
+  flex: 1;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nm-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: rgba(124, 131, 155, 0.8);
+  font-size: 14px;
   font-weight: 500;
-  color: var(--text-h);
+  transition: all 0.2s ease;
+  border-left: 4px solid transparent;
+  border-radius: 0;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
+.nm-nav-link:hover {
+  background-color: rgba(211, 228, 254, 0.06);
+  color: rgba(255, 255, 255, 0.9);
 }
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
+
+.nm-nav-link.active {
+  background-color: rgba(211, 228, 254, 0.1);
+  border-left: 4px solid var(--secondary-fixed);
+  color: var(--secondary-fixed);
 }
-p {
+
+.nm-nav-link .material-symbols-outlined {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.nm-system-status {
+  margin: 16px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.nm-sidebar-user {
+  padding: 16px;
+  border-top: 1px solid rgba(124, 131, 155, 0.15);
+}
+
+/* ============================================================
+   TOPBAR COMPONENTS
+   ============================================================ */
+.nm-search-bar {
+  position: relative;
+  flex: 1;
+  max-width: 480px;
+}
+
+.nm-search-bar input {
+  width: 100%;
+  background-color: var(--surface-container-low);
+  border: none;
+  border-radius: 24px;
+  padding: 10px 16px 10px 40px;
+  font-size: 14px;
+  color: var(--on-surface);
+  font-family: var(--font-sans);
+  outline: none;
+  transition: box-shadow 0.2s;
+}
+
+.nm-search-bar input:focus {
+  box-shadow: 0 0 0 2px var(--primary-container);
+}
+
+.nm-search-bar .material-symbols-outlined {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--secondary);
+  font-size: 18px;
+  pointer-events: none;
+}
+
+.nm-icon-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--secondary);
+  transition: background-color 0.2s;
+  position: relative;
+}
+
+.nm-icon-btn:hover { background-color: var(--surface-container-low); color: var(--on-surface); }
+
+.nm-icon-btn .material-symbols-outlined { font-size: 22px; }
+
+.nm-divider-v {
+  width: 1px;
+  height: 32px;
+  background-color: var(--outline-variant);
+  flex-shrink: 0;
+}
+
+.nm-topbar-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.nm-topbar-profile img {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--outline-variant);
+  object-fit: cover;
+}
+
+/* ============================================================
+   MATERIAL SYMBOLS HELPER
+   ============================================================ */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+  user-select: none;
+}
+
+.material-symbols-filled {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ============================================================
+   CARD COMPONENTS
+   ============================================================ */
+.nm-card {
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  transition: box-shadow 0.2s ease;
+}
+
+.nm-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+
+.nm-card-padding { padding: 20px; }
+
+/* ============================================================
+   STATUS BADGE
+   ============================================================ */
+.nm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nm-badge-success  { background: #dcfce7; color: #16a34a; }
+.nm-badge-warning  { background: #fef9c3; color: #ca8a04; }
+.nm-badge-danger   { background: #fee2e2; color: #dc2626; }
+.nm-badge-info     { background: #dbeafe; color: #2563eb; }
+.nm-badge-blue     { background: #dbeafe; color: #1d4ed8; }
+.nm-badge-purple   { background: #ede9fe; color: #7c3aed; }
+.nm-badge-default  { background: var(--surface-container); color: var(--secondary); }
+
+/* ============================================================
+   TABLE STYLES
+   ============================================================ */
+.nm-table-container {
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.nm-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.nm-table thead {
+  background-color: var(--surface-container-low);
+}
+
+.nm-table thead th {
+  padding: 14px 24px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--secondary);
+  border-bottom: 1px solid var(--outline-variant);
+  white-space: nowrap;
+}
+
+.nm-table tbody tr {
+  border-bottom: 1px solid var(--outline-variant);
+  transition: background-color 0.15s;
+}
+
+.nm-table tbody tr:last-child { border-bottom: none; }
+.nm-table tbody tr:hover { background-color: rgba(242, 244, 246, 0.6); }
+
+.nm-table tbody td {
+  padding: 14px 24px;
+  font-size: 14px;
+  color: var(--on-surface);
+  vertical-align: middle;
+}
+
+.nm-table .id-code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--on-surface-variant);
+}
+
+/* Customer avatar initial bubble */
+.nm-avatar-initials {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: rgba(208, 225, 251, 0.4);
+  color: var(--primary-container);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.nm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nm-btn .material-symbols-outlined { font-size: 18px; }
+
+.nm-btn-primary {
+  background-color: var(--primary-container);
+  color: #ffffff;
+}
+.nm-btn-primary:hover { background-color: #0f172a; color: #ffffff; }
+
+.nm-btn-secondary {
+  background-color: transparent;
+  border: 1px solid var(--outline-variant);
+  color: var(--secondary);
+}
+.nm-btn-secondary:hover { background-color: var(--surface-container-low); color: var(--on-surface); }
+
+.nm-btn-danger {
+  background-color: transparent;
+  border: 1px solid var(--error);
+  color: var(--error);
+}
+.nm-btn-danger:hover { background-color: rgba(186, 26, 26, 0.05); }
+
+.nm-btn-ghost {
+  background-color: transparent;
+  border: none;
+  color: var(--secondary);
+  padding: 6px 8px;
+}
+.nm-btn-ghost:hover { background-color: var(--surface-container-low); color: var(--on-surface); }
+
+.nm-btn-sm { padding: 6px 12px; font-size: 12px; }
+.nm-btn-sm .material-symbols-outlined { font-size: 16px; }
+
+/* ============================================================
+   FORMS & INPUTS
+   ============================================================ */
+.nm-input, .nm-select {
+  width: 100%;
+  padding: 10px 14px;
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--on-surface);
+  font-family: var(--font-sans);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+
+.nm-input:focus, .nm-select:focus {
+  border-color: var(--primary-container);
+  box-shadow: 0 0 0 2px rgba(19, 27, 46, 0.08);
+}
+
+.nm-input-group {
+  position: relative;
+}
+
+.nm-input-group .material-symbols-outlined {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  color: var(--outline);
+  pointer-events: none;
+  transition: color 0.15s;
+}
+
+.nm-input-group:focus-within .material-symbols-outlined {
+  color: var(--primary-container);
+}
+
+.nm-input-group .nm-input { padding-left: 40px; }
+
+.nm-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--secondary);
+  margin-bottom: 6px;
+}
+
+/* ============================================================
+   MODALS
+   ============================================================ */
+.nm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(19, 27, 46, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.nm-modal {
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+  width: 100%;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modal-in 0.2s ease;
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.nm-modal-sm  { max-width: 440px; }
+.nm-modal-md  { max-width: 560px; }
+.nm-modal-lg  { max-width: 720px; }
+
+.nm-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--outline-variant);
+  background-color: var(--surface-container-low);
+  flex-shrink: 0;
+}
+
+.nm-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--on-surface);
   margin: 0;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+.nm-modal-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--secondary);
+  transition: background-color 0.15s;
+}
+.nm-modal-close:hover { background-color: var(--surface-container); }
+.nm-modal-close .material-symbols-outlined { font-size: 20px; }
+
+.nm-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+.nm-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--outline-variant);
+  background-color: var(--surface-container-low);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   PAGE HEADER
+   ============================================================ */
+.nm-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 28px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.nm-page-title {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--on-surface);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin: 0;
+}
+
+.nm-page-subtitle {
+  font-size: 14px;
+  color: var(--secondary);
+  margin: 6px 0 0;
+}
+
+/* ============================================================
+   METRIC CARD
+   ============================================================ */
+.nm-metric-card {
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  padding: 20px;
+  transition: box-shadow 0.2s;
+}
+.nm-metric-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+
+.nm-metric-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--secondary);
+}
+
+.nm-metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--on-surface);
+  letter-spacing: -0.02em;
+  margin-top: 6px;
+  line-height: 1;
+}
+
+.nm-metric-sub {
+  font-size: 11px;
+  color: rgba(80, 95, 118, 0.65);
+  margin-top: 4px;
+}
+
+.nm-metric-trend-up   { color: #16a34a; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 2px; }
+.nm-metric-trend-down { color: #dc2626; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 2px; }
+.nm-metric-trend-flat { color: var(--secondary); font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 2px; }
+
+.nm-metric-trend-up   .material-symbols-outlined,
+.nm-metric-trend-down .material-symbols-outlined,
+.nm-metric-trend-flat .material-symbols-outlined { font-size: 14px; }
+
+/* ============================================================
+   SPARKLINE SVG
+   ============================================================ */
+.nm-sparkline { width: 80px; height: 40px; overflow: hidden; }
+
+/* ============================================================
+   ACTION ICON BUTTONS (edit / delete / view)
+   ============================================================ */
+.nm-action-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+  color: var(--secondary);
+}
+.nm-action-btn .material-symbols-outlined { font-size: 18px; }
+.nm-action-btn:hover { background-color: var(--surface-container-low); color: var(--on-surface); }
+.nm-action-btn.danger:hover { background-color: #fee2e2; color: var(--error); }
+.nm-action-btn.success:hover { background-color: #dcfce7; color: #16a34a; }
+
+/* ============================================================
+   TABS (underline style)
+   ============================================================ */
+.nm-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--outline-variant);
+  gap: 0;
+}
+
+.nm-tab-btn {
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  position: relative;
+  bottom: -1px;
+}
+
+.nm-tab-btn:hover { color: var(--on-surface); background-color: var(--surface-container-low); }
+.nm-tab-btn.active { color: var(--on-surface); font-weight: 700; border-bottom-color: var(--on-surface); }
+
+/* ============================================================
+   PAGINATION
+   ============================================================ */
+.nm-pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nm-page-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-lowest);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nm-page-btn:hover { background-color: var(--surface-container-low); color: var(--on-surface); }
+.nm-page-btn.active { background-color: var(--primary-container); color: #fff; border-color: var(--primary-container); }
+.nm-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ============================================================
+   LOGIN PAGE
+   ============================================================ */
+.nm-login-bg {
+  min-height: 100vh;
+  background-color: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.nm-login-blob-1 {
+  position: fixed;
+  top: -20%;
+  left: -10%;
+  width: 60%;
+  height: 60%;
+  border-radius: 50%;
+  background-color: var(--secondary-container);
+  filter: blur(120px);
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.nm-login-blob-2 {
+  position: fixed;
+  bottom: -10%;
+  right: -5%;
+  width: 50%;
+  height: 50%;
+  border-radius: 50%;
+  background-color: var(--secondary-fixed);
+  filter: blur(120px);
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.nm-login-card {
+  width: 100%;
+  max-width: 440px;
+  position: relative;
+  z-index: 10;
+  background: var(--surface-container-lowest);
+  border: 1px solid rgba(198, 198, 205, 0.6);
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 2px 8px rgba(0,0,0,0.03);
+}
+
+/* ============================================================
+   ACTIVITY FEED
+   ============================================================ */
+.nm-event-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nm-event-dot .material-symbols-outlined { font-size: 16px; }
+
+/* ============================================================
+   REVIEW CARDS
+   ============================================================ */
+.nm-review-card {
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  transition: box-shadow 0.2s;
+}
+.nm-review-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+
+.nm-review-flag {
+  width: 6px;
+  flex-shrink: 0;
+}
+
+/* Star rating */
+.nm-stars { display: flex; gap: 2px; }
+.nm-stars .material-symbols-outlined {
+  font-size: 18px;
+  color: #FACC15;
+}
+.nm-stars .material-symbols-outlined.empty {
+  color: var(--outline-variant);
+}
+
+/* ============================================================
+   MISC UTILITIES
+   ============================================================ */
+.nm-page-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--on-surface);
+  margin: 0 0 4px;
+}
+
+.nm-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--secondary);
+}
+
+.nm-empty-state .material-symbols-outlined {
+  font-size: 48px;
+  margin-bottom: 12px;
+  color: var(--outline-variant);
+}
+
+.nm-text-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--on-surface-variant);
+  background-color: var(--surface-container-low);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.nm-notification-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--error);
+  border-radius: 50%;
+  border: 2px solid white;
 }
