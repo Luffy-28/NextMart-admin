@@ -11,6 +11,8 @@ import { connectRedis } from "./src/helpers/redisClient.js";
 import customerManagementRouter from "./src/routers/customerManagementRouter.js";
 import categoryManagementRouter from "./src/routers/categoryManagementRouter.js";
 import productManagementRouter from "./src/routers/productManagementRouter.js";
+import reviewManagementRouter from "./src/routers/reviewManagemntRouter.js"
+import paymentManagementRouter from "./src/routers/paymentManagementRouter.js"
 configDotenv();
 
 const app = express();
@@ -34,6 +36,8 @@ app.use("/api/v1/users", userRouter);
 app.use("api/v1/customers", customerManagementRouter)
 app.use("api/v1/category", categoryManagementRouter)
 app.use("api/v1/products", productManagementRouter)
+app.use("api/v1/review", reviewManagementRouter)
+app.use("api/v1/payment", paymentManagementRouter)
 
 const startServer = async () => {
   try {
