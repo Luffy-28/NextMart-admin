@@ -17,12 +17,11 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["customer", "admin"],
-      default: "customer",
+      default: "admin",
     },
     image: {
       type: String,
-      default:""
+      default: "",
     },
     isVerified: {
       type: Boolean,
@@ -34,4 +33,4 @@ const userSchema = new mongoose.Schema(
   },
 );
 
-export const User = mongoose.model("User", userSchema);
+export const Admin = mongoose.model("Admin", userSchema);
