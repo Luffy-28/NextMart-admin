@@ -13,6 +13,7 @@ import categoryManagementRouter from "./src/routers/categoryManagementRouter.js"
 import productManagementRouter from "./src/routers/productManagementRouter.js";
 import reviewManagementRouter from "./src/routers/reviewManagemntRouter.js"
 import paymentManagementRouter from "./src/routers/paymentManagementRouter.js"
+import dashboardRouter from "./src/routers/dashboardRouter.js"
 configDotenv();
 
 const app = express();
@@ -38,6 +39,7 @@ app.use("api/v1/category", categoryManagementRouter)
 app.use("api/v1/products", productManagementRouter)
 app.use("api/v1/review", reviewManagementRouter)
 app.use("api/v1/payment", paymentManagementRouter)
+app.use("api/v1/dashboard", dashboardRouter)
 
 const startServer = async () => {
   try {
