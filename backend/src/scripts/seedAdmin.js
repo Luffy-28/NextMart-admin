@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { configDotenv } from "dotenv";
-import { User } from "../models/userModel.js";
+import { Admin } from "../models/adminUserModel.js";
 import { hashPassword } from "../helpers/encryptHelper.js";
 import { config } from "../config/config.js";
 
@@ -19,7 +19,7 @@ const seedAdmin = async () => {
     const plainPassword = "Password123!";
 
     // 3. Check if an admin with this email already exists
-    const existingAdmin = await User.findOne({ email: adminEmail });
+    const existingAdmin = await Admin.findOne({ email: adminEmail });
 
     if (existingAdmin) {
       console.log(`⚠️ Admin user with email ${adminEmail} already exists! No new user was created.`);
@@ -33,7 +33,7 @@ const seedAdmin = async () => {
         isVerified: true, // Automatically verify the admin account
       };
 
-      await User.create(adminData);
+      await Admin.create(adminData);
       console.log(`✅ Admin user successfully created!`);
       console.log(`📧 Email: ${adminEmail}`);
       console.log(`🔑 Password: ${plainPassword}`);

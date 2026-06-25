@@ -7,19 +7,20 @@ export const getAllOrder = async(req, res)=>{
         const limitNum = parseInt(limit);
         const skip =(pageNum-1)*limitNum;
 
-        const filter = {
-            $or:[
-                {orderId:{$regex:query, $options:"i"}},
-            ]
-        }
-        const orders = await Order.find(filter).skip(skip).limit(limitNum).sort({createdAt: -1});
-        const totalOrder = await Order.countDocuments(filter)
-        if(!order){
-            return res.status(404).send({
-                status:"errror",
-                message:"Order not found",
-            })
-        }
+        // orderNumber is a string field in the schema — search on it
+        const filter = query
+          ? { orderNumber: { $regex: query, $options: "i" } }
+          : {};
+
+        const orders = await Order.find(filter)
+          .skip(skip)
+          .limit(limitNum)
+          .sort({createdAt: -1})
+          .populate("user", "name email")
+          .populate("shippingAddress");
+
+        const totalOrder = await Order.countDocuments(filter);
+
         return res.status(200).send({
             status:"success",
             message:"Orders fetched successfully",
@@ -41,7 +42,7 @@ export const getAllOrder = async(req, res)=>{
     }
 }
 
-// get order detials
+// get order details
 export const getOrderDetails = async(req,res)=>{
     try {
         const {orderId} = req.params;
@@ -51,7 +52,10 @@ export const getOrderDetails = async(req,res)=>{
                 message:"Order ID is required",
             })
         }
-        const order = await Order.findById(orderId).populate("user").populate("items.product").exec();
+        const order = await Order.findById(orderId)
+          .populate("user", "name email")
+          .populate("shippingAddress")
+          .populate("items.product", "name images");
         if(!order){
             return res.status(404).send({
                 status:"error",
@@ -77,14 +81,14 @@ export const getOrderDetails = async(req,res)=>{
 export const updateOrderStatus = async(req,res)=>{
     try {
         const {orderId} = req.params;
-        const {status} = req.body;
-        if(!orderId || !status){
+        const {orderStatus} = req.body;   // field in schema is "orderStatus"
+        if(!orderId || !orderStatus){
             return res.status(400).send({
                 status:"error",
-                message:"Order ID and status are required",
+                message:"Order ID and orderStatus are required",
             })
         }
-        const order = await Order.findByIdAndUpdate(orderId,{status},{new:true});
+        const order = await Order.findByIdAndUpdate(orderId, {orderStatus}, {new:true});
         if(!order){
             return res.status(404).send({
                 status:"error",

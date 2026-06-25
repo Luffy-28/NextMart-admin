@@ -15,7 +15,7 @@ export const getAllSubCategories = async (req, res) => {
    const filter = {};
 
 
-   // Optional parent-category filter (used when the frontend expands a category row)
+   // Optional parent-category filter 
    if (categoryId) {
      filter.category = categoryId;
    }

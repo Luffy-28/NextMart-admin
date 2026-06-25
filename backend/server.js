@@ -11,12 +11,11 @@ import { connectRedis } from "./src/helpers/redisClient.js";
 import customerManagementRouter from "./src/routers/customerManagementRouter.js";
 import categoryManagementRouter from "./src/routers/categoryManagementRouter.js";
 import productManagementRouter from "./src/routers/productManagementRouter.js";
-import reviewManagementRouter from "./src/routers/reviewManagemntRouter.js"
-import paymentManagementRouter from "./src/routers/paymentManagementRouter.js"
-import dashboardRouter from "./src/routers/dashboardRouter.js"
-import dealManagementRouter from "./src/routers/dealsManagementRouter.js"
-import subCategoryManagementRouter from "./src/routers/subcategoryManagementRouter.js"
-
+import reviewManagementRouter from "./src/routers/reviewManagemntRouter.js";
+import paymentManagementRouter from "./src/routers/paymentManagementRouter.js";
+import dashboardRouter from "./src/routers/dashboardRouter.js";
+import dealManagementRouter from "./src/routers/dealsManagementRouter.js";
+import subCategoryManagementRouter from "./src/routers/subcategoryManagementRouter.js";
 
 configDotenv();
 
@@ -38,14 +37,14 @@ app.get("/", (req, res) => {
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
-app.use("api/v1/customers", customerManagementRouter)
-app.use("api/v1/category", categoryManagementRouter)
-app.use("api/v1/products", productManagementRouter)
-app.use("api/v1/review", reviewManagementRouter)
-app.use("api/v1/payment", paymentManagementRouter)
-app.use("api/v1/dashboard", dashboardRouter)
-app.use("api/v1/deals", dealManagementRouter)
-app.use("api/v1/sub-category", subCategoryManagementRouter)
+app.use("/api/v1/customers", customerManagementRouter);
+app.use("/api/v1/category", categoryManagementRouter);
+app.use("/api/v1/products", productManagementRouter);
+app.use("/api/v1/review", reviewManagementRouter);
+app.use("/api/v1/payment", paymentManagementRouter);
+app.use("/api/v1/dashboard", dashboardRouter);
+app.use("/api/v1/deals", dealManagementRouter);
+app.use("/api/v1/sub-category", subCategoryManagementRouter);
 const startServer = async () => {
   try {
     await mongoose.connect(mongourl);

@@ -5,8 +5,8 @@ const router = express.Router();
 
 
 router.get("/", getAllPayments)
-router.get("/:id", getPaymentById)
-router.patch("/status/:id", updateStatus)
+router.get("/:paymentId", getPaymentById)
+router.patch("/status/:paymentId", updateStatus)
 
 
 export default router
