@@ -1,224 +1,596 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import * as XLSX from 'xlsx';
 import MetricCard from '../components/ui/MetricCard';
 import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
+import {
+  fetchDashboardStats,
+  fetchDashboardRevenue,
+  fetchDashboardBestSelling,
+  fetchDashboardLatestOrders,
+} from '../features/dashboard/dashboardAction';
 
-// Sparkline SVG helpers
-const GreenSparkline = () => (
-  <svg viewBox="0 0 100 40" className="w-100 h-100">
-    <path d="M0,35 Q10,32 20,38 T40,25 T60,15 T80,28 T100,5" fill="none" stroke="#22c55e" strokeWidth="2"/>
-    <path d="M0,35 Q10,32 20,38 T40,25 T60,15 T80,28 T100,5 V40 H0 Z" fill="rgba(34,197,94,0.1)"/>
-  </svg>
-);
+// ─── Sparkline built from real revenue data ───────────────────────────────────
+const RevenueSparkline = ({ data = [] }) => {
+  if (!data.length) return null;
+  const values = data.map(d => d.revenue);
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const W = 100, H = 40;
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * W;
+    const y = H - ((v - min) / range) * (H - 4) - 2;
+    return `${x},${y}`;
+  });
+  const polyline = points.join(' ');
+  const area = `${points[0].split(',')[0]},${H} ` + polyline + ` ${points[points.length - 1].split(',')[0]},${H}`;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-100 h-100">
+      <polygon points={area} fill="rgba(34,197,94,0.12)" />
+      <polyline points={polyline} fill="none" stroke="#22c55e" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+};
 
 const BlueSparkline = () => (
   <svg viewBox="0 0 100 40" className="w-100 h-100">
-    <path d="M0,30 T25,25 T50,20 T75,15 T100,8" fill="none" stroke="#3b82f6" strokeWidth="2"/>
-    <path d="M0,30 T25,25 T50,20 T75,15 T100,8 V40 H0 Z" fill="rgba(59,130,246,0.1)"/>
+    <path d="M0,30 T25,25 T50,20 T75,15 T100,8" fill="none" stroke="#3b82f6" strokeWidth="2" />
+    <path d="M0,30 T25,25 T50,20 T75,15 T100,8 V40 H0 Z" fill="rgba(59,130,246,0.1)" />
   </svg>
 );
 
-const RECENT_ORDERS = [
-  { id: '#ORD-94821', customer: 'Alex Morgan',    amount: '$1,240.00', status: 'Delivered', initials: 'AM' },
-  { id: '#ORD-94820', customer: 'Sarah Jenkins',  amount: '$89.50',    status: 'Shipped',   initials: 'SJ' },
-  { id: '#ORD-94819', customer: 'Thomas Wright',  amount: '$542.25',   status: 'Processing',initials: 'TW' },
-  { id: '#ORD-94818', customer: 'Lisa Johnson',   amount: '$2,100.00', status: 'Delivered', initials: 'LJ' },
-  { id: '#ORD-94817', customer: 'Bill Riley',     amount: '$12.99',    status: 'Cancelled', initials: 'BR' },
-];
+// ─── Skeleton loader ──────────────────────────────────────────────────────────
+const Skeleton = ({ h = 20, w = '100%', radius = 8, mb = 0 }) => (
+  <div style={{
+    height: h, width: w, borderRadius: radius,
+    background: 'var(--surface-container)',
+    marginBottom: mb,
+    animation: 'nm-skeleton-pulse 1.5s ease-in-out infinite',
+  }} />
+);
 
-const SYSTEM_EVENTS = [
-  { icon: 'person_add', color: '#2563eb', bg: '#dbeafe', text: 'New Merchant registered: "Organic Delights LLC"', time: '2 mins ago • Registration Module' },
-  { icon: 'inventory',  color: '#ca8a04', bg: '#fef9c3', text: 'Stock Alert: MacBook Air M3 (Space Gray) below threshold.', time: '45 mins ago • Inventory Manager' },
-  { icon: 'security',   color: '#7c3aed', bg: '#ede9fe', text: 'Security: Admin session timeout for ID #4928.', time: '1 hr ago • System logs' },
-  { icon: 'task_alt',   color: '#16a34a', bg: '#dcfce7', text: 'Payout: Monthly settlements completed for 124 vendors.', time: '3 hrs ago • Finance' },
-];
+// ─── Revenue chart from real data ─────────────────────────────────────────────
+const RevenueChart = ({ data = [] }) => {
+  if (!data.length) return (
+    <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--secondary)', fontSize: 14 }}>
+      No revenue data available
+    </div>
+  );
+  const W = 1000, H = 260;
+  const values = data.map(d => d.revenue);
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
 
+  const pts = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * W;
+    const y = H - ((d.revenue - min) / range) * (H - 30) - 10;
+    return { x, y, d };
+  });
+
+  const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaPath = linePath + ` L${W},${H} L0,${H} Z`;
+
+  // Pick evenly spaced date labels (max 6)
+  const step = Math.max(1, Math.floor(data.length / 5));
+  const labels = data.filter((_, i) => i % step === 0 || i === data.length - 1);
+
+  return (
+    <div style={{ height: 280, position: 'relative' }}>
+      <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="revGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style={{ stopColor: 'var(--primary-container)', stopOpacity: 0.18 }} />
+            <stop offset="100%" style={{ stopColor: 'var(--primary-container)', stopOpacity: 0 }} />
+          </linearGradient>
+        </defs>
+        {[0.25, 0.5, 0.75, 1].map(f => (
+          <line key={f} x1="0" y1={H * f} x2={W} y2={H * f} stroke="var(--outline-variant)" strokeWidth="1" opacity="0.5" />
+        ))}
+        <path d={areaPath} fill="url(#revGrad)" />
+        <path d={linePath} fill="none" stroke="var(--primary-container)" strokeWidth="3" strokeLinejoin="round" />
+        {pts.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r="4" fill="var(--primary-container)" opacity="0.7" />
+        ))}
+      </svg>
+      <div className="d-flex justify-content-between mt-2" style={{ fontSize: 10, color: 'var(--secondary)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {labels.map(d => <span key={d.date}>{d.date}</span>)}
+      </div>
+    </div>
+  );
+};
+
+// ─── Table column defs ────────────────────────────────────────────────────────
 const ORDER_COLS = [
-  { key: 'id',       label: 'Order ID',  render: r => <span className="nm-text-code">{r.id}</span> },
+  {
+    key: 'orderNumber', label: 'Order ID',
+    render: r => <span className="nm-text-code">#{r.orderNumber}</span>
+  },
   {
     key: 'customer', label: 'Customer',
     render: r => (
       <div className="d-flex align-items-center gap-3">
         <span className="nm-avatar-initials">{r.initials}</span>
-        <span style={{ fontWeight: 500 }}>{r.customer}</span>
+        <div>
+          <div style={{ fontWeight: 500, fontSize: 13 }}>{r.customer}</div>
+          <div style={{ fontSize: 11, color: 'var(--secondary)' }}>{r.email}</div>
+        </div>
       </div>
     )
   },
-  { key: 'amount',   label: 'Amount',   render: r => <strong>{r.amount}</strong> },
-  { key: 'status',   label: 'Status',   render: r => <StatusBadge status={r.status} /> },
-  {
-    key: 'actions', label: 'Actions', sortable: false,
-    render: () => (
-      <button className="nm-action-btn">
-        <span className="material-symbols-outlined">more_vert</span>
-      </button>
-    )
-  }
+  { key: 'amount', label: 'Amount', render: r => <strong>{r.amount}</strong> },
+  { key: 'status', label: 'Status', render: r => <StatusBadge status={r.status} /> },
+  { key: 'paymentStatus', label: 'Payment', render: r => <StatusBadge status={r.paymentStatus} /> },
 ];
 
-const Dashboard = () => (
-  <div>
-    {/* Page Header */}
-    <div className="nm-page-header">
-      <div>
-        <h2 className="nm-page-title">Dashboard Overview</h2>
-        <p className="nm-page-subtitle">Real-time performance metrics for NextMart Retailers.</p>
+const PRODUCT_COLS = [
+  {
+    key: 'name', label: 'Product',
+    render: r => (
+      <div className="d-flex align-items-center gap-3">
+        {r.image?.[0] ? (
+          <img src={r.image[0]} alt={r.name} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--outline-variant)' }} />
+        ) : (
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--secondary)' }}>inventory_2</span>
+          </div>
+        )}
+        <span style={{ fontWeight: 500, fontSize: 13 }}>{r.name}</span>
       </div>
-      <div className="d-flex gap-2">
-        <button className="nm-btn nm-btn-secondary">
-          <span className="material-symbols-outlined">calendar_today</span>
-          Last 30 Days
-        </button>
-        <button className="nm-btn nm-btn-primary">
-          <span className="material-symbols-outlined">download</span>
-          Export Report
-        </button>
-      </div>
-    </div>
+    )
+  },
+  { key: 'unitsSold', label: 'Units Sold', render: r => <strong>{r.unitsSold}</strong> },
+  { key: 'revenue', label: 'Revenue', render: r => <span style={{ color: 'var(--primary-container)', fontWeight: 600 }}>${r.revenue?.toLocaleString()}</span> },
+  {
+    key: 'stock', label: 'Stock',
+    render: r => (
+      <span style={{ color: r.stock < 10 ? 'var(--error)' : 'var(--secondary)', fontWeight: r.stock < 10 ? 700 : 400 }}>
+        {r.stock ?? '—'}
+      </span>
+    )
+  },
+];
 
-    {/* KPI Cards */}
-    <div className="row g-4 mb-4">
-      <div className="col-12 col-sm-6 col-xl-3">
-        <MetricCard
-          label="Total Revenue"
-          value="$142,384.50"
-          trendValue="12.5%"
-          trendDir="up"
-          sub="vs $126k last month"
-          sparkline={<GreenSparkline />}
-        />
-      </div>
-      <div className="col-12 col-sm-6 col-xl-3">
-        <MetricCard
-          label="Total Orders"
-          value="1,842"
-          trendValue="8.2%"
-          trendDir="up"
-          sub="Processed this month"
-          sparkline={<BlueSparkline />}
-        />
-      </div>
-      <div className="col-12 col-sm-6 col-xl-3">
-        <MetricCard
-          label="Active Users"
-          value="24.5k"
-          trendValue="0.0%"
-          trendDir="flat"
-          sub="Active in last 24hrs"
-        />
-      </div>
-      <div className="col-12 col-sm-6 col-xl-3">
-        <MetricCard
-          label="Pending Reviews"
-          value="42"
-          sub="Action required today"
-          alert
-        />
-      </div>
-    </div>
+// ─── Date range presets ──────────────────────────────────────────────────────
+const DATE_PRESETS = [
+  { label: 'Last 7 Days',   days: 7,   period: 'daily'   },
+  { label: 'Last 30 Days',  days: 30,  period: 'daily'   },
+  { label: 'Last 90 Days',  days: 90,  period: 'weekly'  },
+  { label: 'Last 6 Months', days: 180, period: 'weekly'  },
+  { label: 'Last 1 Year',   days: 365, period: 'monthly' },
+];
 
-    {/* Sales Chart */}
-    <div className="nm-card nm-card-padding mb-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
+// ─── Main Dashboard Component ─────────────────────────────────────────────────
+const Dashboard = () => {
+  const dispatch = useDispatch();
+  const { stats, revenue, bestSelling, latestOrders, loading, error } = useSelector(state => state.dashboardStore);
+
+  const [selectedPreset, setSelectedPreset] = useState(DATE_PRESETS[1]);
+  const [pickerOpen, setPickerOpen]         = useState(false);
+  const [orderSearch, setOrderSearch]       = useState('');
+  const [productSearch, setProductSearch]   = useState('');
+  const [exporting, setExporting]           = useState(false);
+
+  // Fetch everything based on the selected preset
+  const fetchAll = (preset) => {
+    dispatch(fetchDashboardStats(preset.days));
+    dispatch(fetchDashboardRevenue(preset.period, preset.days));
+    dispatch(fetchDashboardBestSelling(5));
+    dispatch(fetchDashboardLatestOrders(8));
+  };
+
+  useEffect(() => {
+    fetchAll(selectedPreset);
+  }, [dispatch]);
+
+  const handlePresetSelect = (preset) => {
+    setSelectedPreset(preset);
+    setPickerOpen(false);
+    fetchAll(preset);
+  };
+
+  // ── Derived metric values ──────────────────────────────────────────────────
+  const totalRevenue = stats?.totalRevenue != null
+    ? `$${stats.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : '—';
+
+  const revTrend    = stats?.revenueTrend;
+  const revTrendDir = revTrend == null ? 'flat' : revTrend >= 0 ? 'up' : 'down';
+
+  // ── Excel export ────────────────────────────────────────────────────
+  const handleExport = useCallback(() => {
+    setExporting(true);
+    try {
+      const wb = XLSX.utils.book_new();
+      const dateStr = new Date().toLocaleDateString('en-AU').replace(/\//g, '-');
+      const rangeLabel = selectedPreset.label.replace(/\s+/g, '_');
+
+      // Sheet 1 — Summary / KPI
+      const summaryData = [
+        ['NextMart Admin — Dashboard Report'],
+        [`Period: ${selectedPreset.label}`, `Generated: ${new Date().toLocaleString()}`],
+        [],
+        ['Metric', 'Value'],
+        ['Total Revenue', stats?.totalRevenue != null ? `$${stats.totalRevenue.toFixed(2)}` : 'N/A'],
+        ['Total Orders', stats?.totalOrders ?? 'N/A'],
+        ['Active Users', stats?.activeUsers ?? 'N/A'],
+        ['Pending Reviews', stats?.pendingReviews ?? 'N/A'],
+        ['Revenue Trend (%)', stats?.revenueTrend != null ? `${stats.revenueTrend > 0 ? '+' : ''}${stats.revenueTrend}%` : 'N/A'],
+      ];
+      const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+      wsSummary['!cols'] = [{ wch: 22 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+      // Sheet 2 — Revenue Over Time
+      if (revenue?.length) {
+        const revenueRows = [
+          ['Date', 'Revenue ($)', 'Orders'],
+          ...revenue.map(r => [r.date, r.revenue, r.orders]),
+        ];
+        const wsRevenue = XLSX.utils.aoa_to_sheet(revenueRows);
+        wsRevenue['!cols'] = [{ wch: 14 }, { wch: 14 }, { wch: 10 }];
+        XLSX.utils.book_append_sheet(wb, wsRevenue, 'Revenue Over Time');
+      }
+
+      // Sheet 3 — Best Selling Products
+      if (bestSelling?.length) {
+        const productRows = [
+          ['Rank', 'Product Name', 'Units Sold', 'Revenue ($)', 'Stock'],
+          ...bestSelling.map((p, i) => [
+            i + 1,
+            p.name,
+            p.unitsSold,
+            p.revenue,
+            p.stock ?? 'N/A',
+          ]),
+        ];
+        const wsProducts = XLSX.utils.aoa_to_sheet(productRows);
+        wsProducts['!cols'] = [{ wch: 6 }, { wch: 32 }, { wch: 12 }, { wch: 14 }, { wch: 8 }];
+        XLSX.utils.book_append_sheet(wb, wsProducts, 'Best Selling Products');
+      }
+
+      // Sheet 4 — Latest Orders
+      if (latestOrders?.length) {
+        const orderRows = [
+          ['Order #', 'Customer', 'Email', 'Amount', 'Order Status', 'Payment Status', 'Date'],
+          ...latestOrders.map(o => [
+            o.orderNumber,
+            o.customer,
+            o.email,
+            o.amount,
+            o.status,
+            o.paymentStatus,
+            o.createdAt ? new Date(o.createdAt).toLocaleDateString() : 'N/A',
+          ]),
+        ];
+        const wsOrders = XLSX.utils.aoa_to_sheet(orderRows);
+        wsOrders['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 26 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+        XLSX.utils.book_append_sheet(wb, wsOrders, 'Latest Orders');
+      }
+
+      XLSX.writeFile(wb, `NextMart_Dashboard_${rangeLabel}_${dateStr}.xlsx`);
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setExporting(false);
+    }
+  }, [stats, revenue, bestSelling, latestOrders, selectedPreset]);
+
+
+  const filteredOrders = (latestOrders || []).filter(o => {
+    if (!orderSearch) return true;
+    const q = orderSearch.toLowerCase();
+    return (
+      String(o.orderNumber ?? '').toLowerCase().includes(q) ||
+      String(o.customer   ?? '').toLowerCase().includes(q) ||
+      String(o.email      ?? '').toLowerCase().includes(q) ||
+      String(o.status     ?? '').toLowerCase().includes(q)
+    );
+  });
+
+  const filteredProducts = (bestSelling || []).filter(p => {
+    if (!productSearch) return true;
+    return String(p.name ?? '').toLowerCase().includes(productSearch.toLowerCase());
+  });
+
+  return (
+    <div>
+      {/* ── Page Header ──────────────────────────────────────────────────── */}
+      <div className="nm-page-header">
         <div>
-          <h3 className="nm-page-section-title">Sales Performance Overview</h3>
-          <p className="nm-page-subtitle" style={{ marginTop: 2 }}>Aggregate revenue trajectory across all product categories.</p>
+          <h2 className="nm-page-title">Dashboard Overview</h2>
+          <p className="nm-page-subtitle">Real-time performance metrics for NextMart Retailers.</p>
         </div>
-        <div className="d-flex align-items-center gap-4">
-          <div className="d-flex align-items-center gap-2">
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--primary-container)', display: 'inline-block' }}/>
-            <span style={{ fontSize: 12, color: 'var(--secondary)', fontWeight: 500 }}>This Year</span>
-          </div>
-          <div className="d-flex align-items-center gap-2">
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--outline-variant)', display: 'inline-block' }}/>
-            <span style={{ fontSize: 12, color: 'var(--secondary)', fontWeight: 500 }}>Last Year</span>
-          </div>
-        </div>
-      </div>
-      <div style={{ height: 280, position: 'relative' }}>
-        <svg width="100%" height="100%" viewBox="0 0 1000 260" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="grad1" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%"   style={{ stopColor: 'rgba(19,27,46,0.12)', stopOpacity: 1 }} />
-              <stop offset="100%" style={{ stopColor: 'rgba(19,27,46,0)',    stopOpacity: 1 }} />
-            </linearGradient>
-          </defs>
-          <line x1="0" y1="50"  x2="1000" y2="50"  stroke="#f1f5f9" strokeWidth="1"/>
-          <line x1="0" y1="110" x2="1000" y2="110" stroke="#f1f5f9" strokeWidth="1"/>
-          <line x1="0" y1="170" x2="1000" y2="170" stroke="#f1f5f9" strokeWidth="1"/>
-          <line x1="0" y1="230" x2="1000" y2="230" stroke="#f1f5f9" strokeWidth="1"/>
-          {/* Area fill */}
-          <path d="M0,220 C100,210 150,160 200,170 C250,180 300,90 400,100 C500,110 600,160 700,140 C800,120 900,55 1000,45 L1000,260 L0,260 Z" fill="url(#grad1)"/>
-          {/* Main line */}
-          <path d="M0,220 C100,210 150,160 200,170 C250,180 300,90 400,100 C500,110 600,160 700,140 C800,120 900,55 1000,45" fill="none" stroke="var(--primary-container)" strokeWidth="3"/>
-          {/* Last year dashed */}
-          <path d="M0,240 C100,230 200,210 300,220 C400,230 500,175 600,185 C700,195 800,160 900,150 L1000,140" fill="none" stroke="var(--outline-variant)" strokeWidth="2" strokeDasharray="8,4"/>
-        </svg>
-        <div className="d-flex justify-content-between mt-2" style={{ fontSize: 10, color: 'var(--secondary)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          {['Oct 01','Oct 07','Oct 14','Oct 21','Oct 28'].map(d => <span key={d}>{d}</span>)}
-        </div>
-      </div>
-    </div>
+        <div className="d-flex gap-2" style={{ position: 'relative' }}>
+          {/* Date range picker trigger */}
+          <button
+            className="nm-btn nm-btn-secondary"
+            onClick={() => setPickerOpen(o => !o)}
+            style={{ minWidth: 160, justifyContent: 'space-between' }}
+          >
+            <span className="material-symbols-outlined">calendar_today</span>
+            {selectedPreset.label}
+            <span className="material-symbols-outlined" style={{ fontSize: 18, opacity: 0.6, marginLeft: 4 }}>
+              {pickerOpen ? 'expand_less' : 'expand_more'}
+            </span>
+          </button>
 
-    {/* Bottom: Events + Recent Orders */}
-    <div className="row g-4">
-      {/* System Events */}
-      <div className="col-12 col-xl-4">
-        <div className="nm-card nm-card-padding h-100">
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <h3 className="nm-page-section-title">System Events</h3>
-            <button className="nm-btn nm-btn-ghost nm-btn-sm" style={{ color: 'var(--primary-container)', fontWeight: 700 }}>
-              View All
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {SYSTEM_EVENTS.map((ev, i) => (
-              <div key={i} className="d-flex gap-3">
-                <div className="nm-event-dot" style={{ background: ev.bg }}>
-                  <span className="material-symbols-outlined" style={{ color: ev.color, fontSize: 16 }}>{ev.icon}</span>
+          {/* Dropdown */}
+          {pickerOpen && (
+            <>
+              {/* Click-outside overlay */}
+              <div
+                style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                onClick={() => setPickerOpen(false)}
+              />
+              <div style={{
+                position: 'absolute', right: 120, top: '110%', zIndex: 100,
+                background: 'var(--surface-container-lowest)',
+                border: '1px solid var(--outline-variant)',
+                borderRadius: 12,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                minWidth: 200,
+                overflow: 'hidden',
+              }}>
+                <div style={{ padding: '10px 14px 6px', borderBottom: '1px solid var(--outline-variant)' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Date Range
+                  </span>
                 </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: 14, lineHeight: '1.4', color: 'var(--on-surface)' }} dangerouslySetInnerHTML={{
-                    __html: ev.text.replace(/^(\w[\w ]+?):/, '<strong>$1:</strong>')
-                  }} />
-                  <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--secondary)' }}>{ev.time}</p>
-                </div>
+                {DATE_PRESETS.map(preset => (
+                  <button
+                    key={preset.days}
+                    onClick={() => handlePresetSelect(preset)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      width: '100%', padding: '10px 16px',
+                      background: selectedPreset.days === preset.days ? 'var(--primary-container)' + '18' : 'transparent',
+                      border: 'none', cursor: 'pointer',
+                      color: selectedPreset.days === preset.days ? 'var(--primary-container)' : 'var(--on-surface)',
+                      fontWeight: selectedPreset.days === preset.days ? 700 : 400,
+                      fontSize: 13,
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => { if (selectedPreset.days !== preset.days) e.currentTarget.style.background = 'var(--surface-container)'; }}
+                    onMouseLeave={e => { if (selectedPreset.days !== preset.days) e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <span>{preset.label}</span>
+                    {selectedPreset.days === preset.days && (
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check</span>
+                    )}
+                  </button>
+                ))}
               </div>
-            ))}
+            </>
+          )}
+
+          <button
+            className="nm-btn nm-btn-primary"
+            onClick={handleExport}
+            disabled={exporting || (!stats && !revenue && !bestSelling && !latestOrders)}
+          >
+            {exporting ? (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.35)" strokeWidth="4"/>
+                  <path d="M4 12a8 8 0 018-8" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+                </svg>
+                Exporting…
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined">download</span>
+                Export Report
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Error banner ─────────────────────────────────────────────────── */}
+      {error && (
+        <div style={{
+          padding: '10px 16px', borderRadius: 8, marginBottom: 24,
+          background: 'var(--error-container)', color: 'var(--error)',
+          display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+          border: '1px solid rgba(186,26,26,0.2)'
+        }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>error</span>
+          {error}
+        </div>
+      )}
+
+      {/* ── KPI Cards ────────────────────────────────────────────────────── */}
+      <div className="row g-4 mb-4">
+        <div className="col-12 col-sm-6 col-xl-3">
+          {loading && !stats ? (
+            <div className="nm-metric-card h-100"><Skeleton h={14} mb={12} /><Skeleton h={32} mb={8} /><Skeleton h={12} w="60%" /></div>
+          ) : (
+            <MetricCard
+              label="Total Revenue"
+              value={totalRevenue}
+              trendValue={revTrend != null ? `${Math.abs(revTrend)}%` : undefined}
+              trendDir={revTrendDir}
+              sub={`vs previous ${selectedPreset.label.toLowerCase()}`}
+              sparkline={<RevenueSparkline data={revenue || []} />}
+            />
+          )}
+        </div>
+        <div className="col-12 col-sm-6 col-xl-3">
+          {loading && !stats ? (
+            <div className="nm-metric-card h-100"><Skeleton h={14} mb={12} /><Skeleton h={32} mb={8} /><Skeleton h={12} w="60%" /></div>
+          ) : (
+            <MetricCard
+              label="Total Orders"
+              value={stats?.totalOrders?.toLocaleString() ?? '—'}
+              trendDir="up"
+              sub={`Paid orders — ${selectedPreset.label.toLowerCase()}`}
+              sparkline={<BlueSparkline />}
+            />
+          )}
+        </div>
+        <div className="col-12 col-sm-6 col-xl-3">
+          {loading && !stats ? (
+            <div className="nm-metric-card h-100"><Skeleton h={14} mb={12} /><Skeleton h={32} mb={8} /><Skeleton h={12} w="60%" /></div>
+          ) : (
+            <MetricCard
+              label="Active Users"
+              value={stats?.activeUsers?.toLocaleString() ?? '—'}
+              trendDir="flat"
+              sub={`Unique buyers — ${selectedPreset.label.toLowerCase()}`}
+            />
+          )}
+        </div>
+        <div className="col-12 col-sm-6 col-xl-3">
+          {loading && !stats ? (
+            <div className="nm-metric-card h-100"><Skeleton h={14} mb={12} /><Skeleton h={32} mb={8} /><Skeleton h={12} w="60%" /></div>
+          ) : (
+            <MetricCard
+              label="Pending Reviews"
+              value={stats?.pendingReviews ?? '—'}
+              sub="Action required today"
+              alert
+            />
+          )}
+        </div>
+      </div>
+
+      {/* ── Revenue Chart ─────────────────────────────────────────────────── */}
+      <div className="nm-card nm-card-padding mb-4">
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h3 className="nm-page-section-title">Revenue Over Time</h3>
+            <p className="nm-page-subtitle" style={{ marginTop: 2 }}>
+              {selectedPreset.period.charAt(0).toUpperCase() + selectedPreset.period.slice(1)} revenue — {selectedPreset.label.toLowerCase()}.
+            </p>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--primary-container)', display: 'inline-block' }} />
+            <span style={{ fontSize: 12, color: 'var(--secondary)', fontWeight: 500 }}>Revenue</span>
+          </div>
+        </div>
+        {loading && !revenue ? (
+          <div style={{ height: 280 }}><Skeleton h="100%" radius={12} /></div>
+        ) : (
+          <RevenueChart data={revenue || []} />
+        )}
+      </div>
+
+      {/* ── Bottom: Best Selling + Latest Orders ─────────────────────────── */}
+      <div className="row g-4">
+        {/* Best Selling Products */}
+        <div className="col-12 col-xl-5">
+          <div className="nm-card h-100">
+            <div style={{ borderBottom: '1px solid var(--outline-variant)' }}>
+              <div className="d-flex justify-content-between align-items-center px-4 py-3">
+                <h3 className="nm-page-section-title" style={{ margin: 0 }}>Best Selling Products</h3>
+                <span className="nm-badge nm-badge-primary">
+                  {productSearch ? `${filteredProducts.length} result${filteredProducts.length !== 1 ? 's' : ''}` : 'Top 5'}
+                </span>
+              </div>
+              <div className="nm-input-group" style={{ margin: '0 16px 12px', flex: 1 }}>
+                <span className="material-symbols-outlined">search</span>
+                <input
+                  className="nm-input"
+                  type="text"
+                  placeholder="Search products…"
+                  value={productSearch}
+                  onChange={e => setProductSearch(e.target.value)}
+                />
+                {productSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setProductSearch('')}
+                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--outline)', display: 'flex', padding: 0 }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            {loading && !bestSelling ? (
+              <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[1,2,3,4,5].map(i => <Skeleton key={i} h={44} />)}
+              </div>
+            ) : (
+              <DataTable
+                columns={PRODUCT_COLS}
+                data={filteredProducts}
+                searchFields={[]}
+                pageSize={5}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Latest Orders */}
+        <div className="col-12 col-xl-7">
+          <div className="nm-card h-100">
+            <div style={{ borderBottom: '1px solid var(--outline-variant)' }}>
+              <div className="d-flex justify-content-between align-items-center px-4 py-3">
+                <h3 className="nm-page-section-title" style={{ margin: 0 }}>Latest Orders</h3>
+                <span style={{ fontSize: 12, color: 'var(--secondary)' }}>
+                  {orderSearch
+                    ? `${filteredOrders.length} of ${(latestOrders || []).length} orders`
+                    : `${(latestOrders || []).length} orders`}
+                </span>
+              </div>
+              <div className="nm-input-group" style={{ margin: '0 16px 12px', flex: 1 }}>
+                <span className="material-symbols-outlined">search</span>
+                <input
+                  className="nm-input"
+                  type="text"
+                  placeholder="Search by order #, customer or email…"
+                  value={orderSearch}
+                  onChange={e => setOrderSearch(e.target.value)}
+                />
+                {orderSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setOrderSearch('')}
+                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--outline)', display: 'flex', padding: 0 }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            {loading && !latestOrders ? (
+              <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[1,2,3,4,5].map(i => <Skeleton key={i} h={44} />)}
+              </div>
+            ) : (
+              <DataTable
+                columns={ORDER_COLS}
+                data={filteredOrders}
+                searchFields={[]}
+                pageSize={6}
+              />
+            )}
+            <div style={{
+              textAlign: 'center', padding: '14px',
+              borderTop: '1px solid var(--outline-variant)',
+              background: 'var(--surface-container-low)',
+              borderRadius: '0 0 12px 12px'
+            }}>
+              <button className="nm-btn nm-btn-ghost nm-btn-sm" style={{ color: 'var(--primary-container)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 11 }}>
+                View Full Order History
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Recent Orders */}
-      <div className="col-12 col-xl-8">
-        <div className="nm-card h-100">
-          <div className="d-flex justify-content-between align-items-center px-4 py-3" style={{ borderBottom: '1px solid var(--outline-variant)' }}>
-            <h3 className="nm-page-section-title" style={{ margin: 0 }}>Recent Orders</h3>
-            <button className="nm-action-btn">
-              <span className="material-symbols-outlined">filter_list</span>
-            </button>
-          </div>
-          <DataTable
-            columns={ORDER_COLS}
-            data={RECENT_ORDERS}
-            searchFields={['id', 'customer']}
-            placeholder="Search orders…"
-            pageSize={5}
-          />
-          <div style={{
-            textAlign: 'center', padding: '14px',
-            borderTop: '1px solid var(--outline-variant)',
-            background: 'var(--surface-container-low)',
-            borderRadius: '0 0 12px 12px'
-          }}>
-            <button className="nm-btn nm-btn-ghost nm-btn-sm" style={{ color: 'var(--primary-container)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 11 }}>
-              Load Full Transaction History
-            </button>
-          </div>
-        </div>
-      </div>
+      <style>{`
+        @keyframes nm-skeleton-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
     </div>
-  </div>
-);
+  );
+};
 
 export default Dashboard;

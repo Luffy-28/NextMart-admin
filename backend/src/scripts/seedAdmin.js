@@ -15,7 +15,7 @@ const seedAdmin = async () => {
     console.log("Connected to MongoDB successfully.");
 
     // 2. Define the admin credentials
-    const adminEmail = "admin@nextmart.com";
+    const adminEmail = "admin@gmail.com";
     const plainPassword = "Password123!";
 
     // 3. Check if an admin with this email already exists
