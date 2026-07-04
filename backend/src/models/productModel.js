@@ -78,7 +78,6 @@ const productSchema = new mongoose.Schema(
     embedding: {
       type: [Number],
     },
-
     slug: {
       type: String,
       unique: true,

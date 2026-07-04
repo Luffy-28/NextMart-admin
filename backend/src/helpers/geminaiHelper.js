@@ -6,10 +6,10 @@ const ai = new GoogleGenAI({ apiKey: config.geminai.geminiApiKey });
 export async function createEmbedding(text) {
   try {
     const result = await ai.models.embedContent({
-      model: "gemini-embedding-001",   // confirmed available model
+      model: "gemini-embedding-001", // confirmed available model
       contents: text,
     });
-    // SDK response shape: { embeddings: [{ values: Float32Array }] }
+
     const values = result?.embeddings?.[0]?.values;
     if (!values || values.length === 0) {
       console.log("Embedding returned empty values");
@@ -21,4 +21,3 @@ export async function createEmbedding(text) {
     return null;
   }
 }
-

@@ -5,6 +5,6 @@ import { loginAdminValidator } from "../middlewares/requestValidator.js";
 
 const router = express.Router();
 
-router.post("/login", authLimiter, loginAdminValidator, loginUser);
+router.post("/login", authLimiter , loginUser);
 
 export default router;

@@ -1,17 +1,6 @@
 import React, { useState, useMemo } from 'react';
 
-/**
- * DataTable — Stitch-styled reusable table.
- * 
- * Props:
- *  columns      Array<{ key, label, sortable?, render? }>
- *  data         Array<object>
- *  searchFields Array<string>   - keys to search across
- *  placeholder  string
- *  pageSize     number (default 5; 0 = no pagination)
- *  emptyText    string
- *  toolbar      ReactNode       - extra elements in toolbar (e.g. Add button)
- */
+
 const DataTable = ({
   columns = [],
   data = [],

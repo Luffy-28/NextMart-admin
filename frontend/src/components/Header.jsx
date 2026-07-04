@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const ROUTE_META = {
   '/dashboard': { title: 'Dashboard Overview',        placeholder: 'Search orders, customers, or reports...' },
@@ -11,7 +12,10 @@ const ROUTE_META = {
 };
 
 const Header = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { pathname } = useLocation();
+  const admin = useSelector((state) => state.adminStore.user);
   const meta = ROUTE_META[pathname] || { title: 'NextMart Admin', placeholder: 'Search...' };
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -96,10 +100,10 @@ const Header = () => {
         <div className="nm-divider-v" />
 
         {/* Admin Profile */}
-        <div className="nm-topbar-profile">
+         <div className="nm-topbar-profile">
           <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--on-surface)', lineHeight: 1 }}>Admin Profile</p>
-            <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--secondary)' }}>Super Admin</p>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--on-surface)', lineHeight: 1 }}>{admin?.name}</p>
+            <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--secondary)' }}>{admin?.email}</p>
           </div>
           <div style={{
             width: 38, height: 38, borderRadius: '50%',
@@ -109,7 +113,20 @@ const Header = () => {
             border: '1px solid var(--outline-variant)',
             cursor: 'pointer'
           }}>
-            SS
+            {admin?.image ? (
+              <img
+                src={admin.image}
+                alt={admin?.name || 'Admin'}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                }}
+              />
+            ) : (
+              admin?.name?.charAt(0).toUpperCase() ?? 'A'
+            )}
           </div>
         </div>
       </div>

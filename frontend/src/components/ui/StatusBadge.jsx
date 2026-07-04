@@ -1,10 +1,5 @@
 import React from 'react';
 
-/**
- * StatusBadge — matches Stitch pill badge style with rounded-full coloring.
- * @param {string} status  - e.g. 'Active', 'Pending', 'Delivered', 'Cancelled'
- * @param {string} [label] - Override display text
- */
 const StatusBadge = ({ status = '', label }) => {
   const s = status.toLowerCase();
   let cls = 'nm-badge ';

@@ -1,16 +1,6 @@
 import React, { useEffect } from 'react';
 
-/**
- * Modal — matches the Stitch admin design glassmorphic modal style.
- * 
- * Props:
- *  isOpen   boolean
- *  onClose  () => void
- *  title    string
- *  children ReactNode  (body content)
- *  footer   ReactNode  (footer buttons)
- *  size     'sm' | 'md' | 'lg'
- */
+
 const Modal = ({ isOpen, onClose, title, children, footer, size = 'md' }) => {
   useEffect(() => {
     if (isOpen) {

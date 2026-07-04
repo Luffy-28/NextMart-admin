@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -8,8 +8,16 @@ import Orders from './pages/Orders';
 import Reviews from './pages/Reviews';
 import Deals from './pages/Deals';
 import Refunds from './pages/Refunds';
+import { useDispatch } from 'react-redux';
+import { autoLogin } from './features/admin/adminAction';
 
 function App() {
+const dispatch = useDispatch();
+
+useEffect(()=>{
+  dispatch(autoLogin())
+},[dispatch])
+
   return (
     <BrowserRouter>
       <Routes>

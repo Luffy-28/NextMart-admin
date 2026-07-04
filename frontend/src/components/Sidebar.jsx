@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { NavLink, useNavigate } from 'react-router-dom';
 
 const NAV_ITEMS = [
@@ -12,6 +13,8 @@ const NAV_ITEMS = [
 
 const Sidebar = () => {
   const navigate = useNavigate();
+   const dispatch = useDispatch();
+  const admin = useSelector((state) => state.adminStore.user);
 
   return (
     <aside className="nm-sidebar">
@@ -71,11 +74,24 @@ const Sidebar = () => {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontWeight: 700, fontSize: 14, color: 'var(--primary-container)'
             }}>
-              SS
+             {admin?.image ? (
+              <img
+                src={admin.image}
+                alt={admin?.name || 'Admin'}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                }}
+              />
+            ) : (
+              admin?.name?.charAt(0).toUpperCase() ?? 'A'
+            )}
             </div>
             <div>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>Shankar Singh</div>
-              <div style={{ color: 'var(--on-primary-container)', fontSize: 11, opacity: 0.7 }}>Super Admin</div>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{admin?.name}</div>
+              <div style={{ color: 'var(--on-primary-container)', fontSize: 11, opacity: 0.7 }}>{admin?.role}</div>
             </div>
           </div>
           <button

@@ -1,26 +1,30 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useForm } from '../hooks/useForm';
+
+import { loginUser } from "../features/admin/adminAction.js";
+const initialState = { email: '', password: '' };
 
 const Login = () => {
+  const dispatch = useDispatch();
+  const location = useLocation();
   const navigate = useNavigate();
-  const [email, setEmail]         = useState('admin@nextmart.com');
-  const [password, setPassword]   = useState('password123');
-  const [showPw, setShowPw]       = useState(false);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState('');
+  const { formData, setFormData, handleChange } = useForm(initialState);
+  const { loading, error } = useSelector((state) => state.adminStore);
+  const [showPw, setShowPw] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    setTimeout(() => {
-      setLoading(false);
-      if (email === 'admin@nextmart.com' && password === 'password123') {
+    try {
+      const success = await dispatch(loginUser(formData));
+      if (success) {
+        setFormData(initialState);
         navigate('/dashboard');
-      } else {
-        setError('Invalid credentials. Please try again.');
       }
-    }, 1200);
+    } catch (err) {
+      console.error('Login error:', err);
+    }
   };
 
   return (
@@ -78,11 +82,12 @@ const Login = () => {
                 <span className="material-symbols-outlined">mail</span>
                 <input
                   id="email"
+                   name="email"
                   className="nm-input"
                   type="email"
                   placeholder="admin@nextmart.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  value={formData.email}
+                  onChange={handleChange}
                   required
                   disabled={loading}
                 />
@@ -99,31 +104,37 @@ const Login = () => {
               </div>
               <div className="nm-input-group" style={{ position: 'relative' }}>
                 <span className="material-symbols-outlined">lock</span>
-                <input
-                  id="password"
-                  className="nm-input"
-                  type={showPw ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                  style={{ paddingRight: 44 }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw(v => !v)}
-                  style={{
-                    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                    border: 'none', background: 'transparent', cursor: 'pointer',
-                    color: 'var(--outline)', display: 'flex', alignItems: 'center', padding: 0
-                  }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                    {showPw ? 'visibility_off' : 'visibility'}
-                  </span>
-                </button>
+                <div style={{ position: 'relative', flex: 1, display: 'flex' }}>
+                  <input
+                    id="password"
+                    name="password"
+                    className="nm-input"
+                    type={showPw ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                    disabled={loading}
+                    style={{ paddingRight: 44, flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw((v) => !v)}
+                    style={{
+                      position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                      border: 'none', background: 'transparent', cursor: 'pointer',
+                      color: 'var(--outline)', display: 'flex', alignItems: 'center', padding: 0,
+                      zIndex: 1,
+                    }}
+                    aria-label={showPw ? 'Hide password' : 'Show password'}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                      {showPw ? 'visibility_off' : 'visibility'}
+                    </span>
+                  </button>
+                </div>
               </div>
+
             </div>
 
             {/* Remember me */}

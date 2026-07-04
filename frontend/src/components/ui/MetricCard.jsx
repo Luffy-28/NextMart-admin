@@ -1,15 +1,6 @@
 import React from 'react';
 
-/**
- * MetricCard — matches Stitch dashboard KPI card design.
- * @param {string} label
- * @param {string|number} value
- * @param {string} [trendValue]     - e.g. "12.5%"
- * @param {'up'|'down'|'flat'} [trendDir]
- * @param {string} [sub]            - subtitle under value
- * @param {boolean} [alert]         - adds error border color for urgent items
- * @param {React.ReactNode} [sparkline] - optional sparkline SVG or element
- */
+
 const MetricCard = ({ label, value, trendValue, trendDir = 'up', sub, alert = false, sparkline }) => {
   return (
     <div className={`nm-metric-card h-100`} style={alert ? { borderColor: 'rgba(186,26,26,0.25)', position: 'relative', overflow: 'hidden' } : {}}>

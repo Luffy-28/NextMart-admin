@@ -1,9 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
 
-/* ============================================================
-   STITCH DESIGN SYSTEM TOKENS — Executive Precision / NextMart
-   ============================================================ */
 :root {
 
   --surface:                  #f7f9fb;
@@ -54,9 +51,7 @@
   --bs-border-color:          var(--outline-variant);
 }
 
-/* ============================================================
-   BASE RESETS
-   ============================================================ */
+
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
@@ -73,9 +68,7 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--outline-variant); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--outline); }
 
-/* ============================================================
-   LAYOUT SCAFFOLD
-   ============================================================ */
+
 .nm-app {
   display: flex;
   min-height: 100vh;
@@ -130,9 +123,7 @@ body {
   height: calc(100vh - var(--header-height));
 }
 
-/* ============================================================
-   SIDEBAR COMPONENTS
-   ============================================================ */
+
 .nm-brand {
   padding: 28px 24px 20px;
 }
@@ -222,9 +213,7 @@ body {
   border-top: 1px solid rgba(124, 131, 155, 0.15);
 }
 
-/* ============================================================
-   TOPBAR COMPONENTS
-   ============================================================ */
+
 .nm-search-bar {
   position: relative;
   flex: 1;
@@ -299,9 +288,7 @@ body {
   object-fit: cover;
 }
 
-/* ============================================================
-   MATERIAL SYMBOLS HELPER
-   ============================================================ */
+
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   vertical-align: middle;
@@ -312,9 +299,7 @@ body {
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-/* ============================================================
-   CARD COMPONENTS
-   ============================================================ */
+
 .nm-card {
   background-color: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
@@ -326,9 +311,6 @@ body {
 
 .nm-card-padding { padding: 20px; }
 
-/* ============================================================
-   STATUS BADGE
-   ============================================================ */
 .nm-badge {
   display: inline-flex;
   align-items: center;
@@ -349,9 +331,7 @@ body {
 .nm-badge-purple   { background: #ede9fe; color: #7c3aed; }
 .nm-badge-default  { background: var(--surface-container); color: var(--secondary); }
 
-/* ============================================================
-   TABLE STYLES
-   ============================================================ */
+
 .nm-table-container {
   background: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
@@ -415,9 +395,7 @@ body {
   flex-shrink: 0;
 }
 
-/* ============================================================
-   BUTTONS
-   ============================================================ */
+
 .nm-btn {
   display: inline-flex;
   align-items: center;
@@ -467,9 +445,7 @@ body {
 .nm-btn-sm { padding: 6px 12px; font-size: 12px; }
 .nm-btn-sm .material-symbols-outlined { font-size: 16px; }
 
-/* ============================================================
-   FORMS & INPUTS
-   ============================================================ */
+
 .nm-input, .nm-select {
   width: 100%;
   padding: 10px 14px;
@@ -519,9 +495,7 @@ body {
   margin-bottom: 6px;
 }
 
-/* ============================================================
-   MODALS
-   ============================================================ */
+
 .nm-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -605,9 +579,7 @@ body {
   flex-shrink: 0;
 }
 
-/* ============================================================
-   PAGE HEADER
-   ============================================================ */
+
 .nm-page-header {
   display: flex;
   justify-content: space-between;
@@ -632,9 +604,7 @@ body {
   margin: 6px 0 0;
 }
 
-/* ============================================================
-   METRIC CARD
-   ============================================================ */
+
 .nm-metric-card {
   background-color: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
@@ -675,14 +645,8 @@ body {
 .nm-metric-trend-down .material-symbols-outlined,
 .nm-metric-trend-flat .material-symbols-outlined { font-size: 14px; }
 
-/* ============================================================
-   SPARKLINE SVG
-   ============================================================ */
 .nm-sparkline { width: 80px; height: 40px; overflow: hidden; }
 
-/* ============================================================
-   ACTION ICON BUTTONS (edit / delete / view)
-   ============================================================ */
 .nm-action-btn {
   width: 32px;
   height: 32px;
@@ -701,9 +665,7 @@ body {
 .nm-action-btn.danger:hover { background-color: #fee2e2; color: var(--error); }
 .nm-action-btn.success:hover { background-color: #dcfce7; color: #16a34a; }
 
-/* ============================================================
-   TABS (underline style)
-   ============================================================ */
+
 .nm-tabs {
   display: flex;
   border-bottom: 1px solid var(--outline-variant);
@@ -727,9 +689,7 @@ body {
 .nm-tab-btn:hover { color: var(--on-surface); background-color: var(--surface-container-low); }
 .nm-tab-btn.active { color: var(--on-surface); font-weight: 700; border-bottom-color: var(--on-surface); }
 
-/* ============================================================
-   PAGINATION
-   ============================================================ */
+
 .nm-pagination {
   display: flex;
   align-items: center;
@@ -757,9 +717,6 @@ body {
 .nm-page-btn.active { background-color: var(--primary-container); color: #fff; border-color: var(--primary-container); }
 .nm-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ============================================================
-   LOGIN PAGE
-   ============================================================ */
 .nm-login-bg {
   min-height: 100vh;
   background-color: var(--surface);
@@ -809,9 +766,7 @@ body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 2px 8px rgba(0,0,0,0.03);
 }
 
-/* ============================================================
-   ACTIVITY FEED
-   ============================================================ */
+
 .nm-event-dot {
   width: 32px;
   height: 32px;
@@ -824,9 +779,7 @@ body {
 
 .nm-event-dot .material-symbols-outlined { font-size: 16px; }
 
-/* ============================================================
-   REVIEW CARDS
-   ============================================================ */
+
 .nm-review-card {
   background: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
@@ -852,9 +805,7 @@ body {
   color: var(--outline-variant);
 }
 
-/* ============================================================
-   MISC UTILITIES
-   ============================================================ */
+
 .nm-page-section-title {
   font-size: 18px;
   font-weight: 600;
