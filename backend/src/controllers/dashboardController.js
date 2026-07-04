@@ -7,9 +7,13 @@ import {capitaliseFirst} from "../helpers/helper.js"
 //GET stats
 export const getDashboardStats = async (req, res) => {
  try {
-   // Revenue & order count (all-time delivered/paid orders)
+   const dayCount = Math.min(parseInt(req.query.days, 10) || 30, 365);
+   const startDate = new Date(Date.now() - dayCount * 24 * 60 * 60 * 1000);
+   const prevStartDate = new Date(Date.now() - dayCount * 2 * 24 * 60 * 60 * 1000);
+
+   // Revenue & order count in the selected window
    const revenueAgg = await Order.aggregate([
-     { $match: { paymentStatus: "paid" } },
+     { $match: { paymentStatus: "paid", createdAt: { $gte: startDate } } },
      {
        $group: {
          _id: null,
@@ -19,42 +23,34 @@ export const getDashboardStats = async (req, res) => {
      },
    ]);
 
-
    const totalRevenue = revenueAgg[0]?.totalRevenue ?? 0;
-   const totalOrders = revenueAgg[0]?.totalOrders ?? 0;
+   const totalOrders  = revenueAgg[0]?.totalOrders  ?? 0;
 
-
-   // Active users — users who placed at least one order in the last 30 days
-   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+   // Active users — unique buyers in the selected window
    const activeUsersAgg = await Order.aggregate([
-     { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+     { $match: { createdAt: { $gte: startDate } } },
      { $group: { _id: "$user" } },
      { $count: "count" },
    ]);
    const activeUsers = activeUsersAgg[0]?.count ?? 0;
 
-
-   // Pending reviews (isApproved: false / pending)
+   // Pending reviews (always all-time)
    const pendingReviews = await Review.countDocuments({ isApproved: "pending" });
 
-
-   // Previous 30-day revenue for trend calculation
-   const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+   // Previous equivalent period revenue for trend %
    const prevRevenueAgg = await Order.aggregate([
      {
        $match: {
          paymentStatus: "paid",
-         createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo },
+         createdAt: { $gte: prevStartDate, $lt: startDate },
        },
      },
      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
    ]);
-   const prevRevenue = prevRevenueAgg[0]?.total ?? 0;
-   const revenueTrend =
-     prevRevenue > 0
-       ? (((totalRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1)
-       : null;
-
+   const prevRevenue  = prevRevenueAgg[0]?.total ?? 0;
+   const revenueTrend = prevRevenue > 0
+     ? (((totalRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1)
+     : null;
 
    return res.status(200).json({
      status: "success",
@@ -64,6 +60,7 @@ export const getDashboardStats = async (req, res) => {
        activeUsers,
        pendingReviews,
        revenueTrend: revenueTrend ? parseFloat(revenueTrend) : null,
+       days: dayCount,
      },
    });
  } catch (error) {
@@ -74,6 +71,7 @@ export const getDashboardStats = async (req, res) => {
    });
  }
 };
+
 
 
 
