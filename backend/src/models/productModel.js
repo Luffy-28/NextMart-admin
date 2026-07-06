@@ -78,7 +78,6 @@ const productSchema = new mongoose.Schema(
     embedding: {
       type: [Number],
     },
-
     slug: {
       type: String,
       unique: true,
@@ -102,7 +101,7 @@ const productSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-productSchema.pre("save", function (next) {
+productSchema.pre("save", async function () {
   if (this.isModified("name")) {
     this.slug = this.name
       .toLowerCase()
@@ -110,7 +109,6 @@ productSchema.pre("save", function (next) {
       .replace(/[^a-z0-9\s-]/g, "")
       .replace(/\s+/g, "-");
   }
-  next();
 });
 
 productSchema.index({ name: "text", description: "text" });

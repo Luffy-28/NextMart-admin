@@ -18,7 +18,6 @@ const userSchema = new mongoose.Schema(
     googleId: { type: String, unique: true, sparse: true },
     role: {
       type: String,
-      enum: ["customer", "admin"],
       default: "customer",
     },
     image: {
@@ -34,23 +33,23 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
     },
-    dob:{
-      type:Date,
+    dob: {
+      type: Date,
     },
-    gender:{
-      type:String,
-      enum:["male","female","other", "prefer not to say"],
-      default:"prefer not to say"
+    gender: {
+      type: String,
+      enum: ["male", "female", "other", "prefer not to say"],
+      default: "prefer not to say",
     },
-    status:{
-      type:String,
-      enum:["block", "unblock"],
-      default:"unblock"
+    status: {
+      type: String,
+      enum: ["block", "unblock"],
+      default: "unblock",
     },
-    reason:{
-      type:String,
-      default:""
-    }
+    reason: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

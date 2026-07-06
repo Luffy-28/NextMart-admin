@@ -44,4 +44,7 @@ export const config = {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS),
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS),
   },
+    geminai:{
+    geminiApiKey: process.env.GEMINI_API_KEY,
+  },
 };

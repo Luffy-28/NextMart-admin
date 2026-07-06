@@ -1,4 +1,4 @@
-import { Product } from "../models/productModel.js";
+import Product from "../models/productModel.js";
 import { createEmbedding,  } from "../helpers/geminaiHelper.js";
 
 
@@ -27,14 +27,16 @@ export const getAllProduct = async(req, res) =>{
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
-        const filter = {
-            $or: [
+        // category is an ObjectId — cannot $regex on it; search by name and brand only
+        const filter = search
+          ? {
+              $or: [
                 { name: { $regex: search, $options: "i" } },
-                {category:{$regex: search, $options: "i"}},
-                
-            ]
-        }
-        const products = await Product.find(filter).skip(skip).limit(limitNum).populate("category").exec();
+                { brand: { $regex: search, $options: "i" } },
+              ]
+            }
+          : {};
+        const products = await Product.find(filter).skip(skip).limit(limitNum).populate("category").populate("subCategory").exec();
         const total = await Product.countDocuments(filter);
         return res.status(200).send({
             status:"success",
@@ -73,7 +75,7 @@ export const createNewProduct = async(req,res) =>{
         if(embedding){
             productData.embedding = embedding;
         }
-        const product = await Product.insertOne(productData);
+        const product = await Product.create(productData);
         if(!product){
             return res.status(400).send({
                 status:"error",
@@ -244,15 +246,16 @@ export const updateStock = async(req, res)=>{
 export const updateStatus = async(req, res)=>{
     try {
         const {productId} = req.params;
-        const {isAvailable} = req.body;
+        // schema field is isActive, not isAvailable
+        const {isActive} = req.body;
 
-        if(typeof isAvailable !== "boolean" || !productId){
+        if(typeof isActive !== "boolean" || !productId){
             return res.status(400).send({
                 status:"error",
-                message:"please provide isAvailable (boolean) and productId"
+                message:"please provide isActive (boolean) and productId"
             })
         }
-        const updatedStatus = await Product.findByIdAndUpdate(productId, {isAvailable}, {new:true});
+        const updatedStatus = await Product.findByIdAndUpdate(productId, {isActive}, {new:true});
         if(!updatedStatus){
             return res.status(404).send({
                 status:"error",
@@ -261,7 +264,7 @@ export const updateStatus = async(req, res)=>{
         }
         return res.status(200).send({
             status:"success",
-            message:"stock updated successfully",
+            message:"product status updated successfully",
             data: updatedStatus,
         })
         

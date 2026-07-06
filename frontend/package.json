@@ -12,13 +12,16 @@
   "dependencies": {
     "@reduxjs/toolkit": "^2.11.2",
     "axios": "^1.15.2",
+    "bootstrap": "^5.3.8",
+    "bootstrap-icons": "^1.13.1",
     "leaflet": "^1.9.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-leaflet": "^5.0.0",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.14.2",
-    "react-toastify": "^11.1.0"
+    "react-toastify": "^11.1.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

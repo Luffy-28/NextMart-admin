@@ -13,7 +13,7 @@ export const authMiddleware = async (req, res, next) => {
       const tokenData = verifyToken(token);
 
       const user = await Admin.findOne({ email: tokenData.email });
-      const {password, ...safeUser} = user.toObject();
+      const { password, ...safeUser } = user.toObject();
       if (user) {
         req.user = safeUser;
         next();
