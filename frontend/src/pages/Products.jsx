@@ -13,6 +13,7 @@ import {
 } from '../features/product/productAction';
 import {
   fetchAllCategories,
+  fetchAllCategoriesList,
   createCategory as createCategoryAction,
   updateCategory as updateCategoryAction,
   deleteCategory as deleteCategoryAction,
@@ -157,7 +158,7 @@ const ImagePicker = ({ value, onChange, size = 80, label = 'Image' }) => {
 /* ─── Collapsible Category Row ──────────────────────────────── */
 const CategoryRow = ({ cat, subCats, onEditCat, onDeleteCat, onEditSub, onDeleteSub, onAddSub }) => {
   const [open, setOpen] = useState(false);
-  const mySubs = subCats.filter(s => s.category === cat.id);
+  const mySubs = subCats.filter(s => s.category === (cat._id || cat.id));
 
   return (
     <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
@@ -671,13 +672,14 @@ const Products = () => {
   const dispatch = useDispatch();
   const { products, loading, pagination } = useSelector(state => state.productStore);
 
-  const { categories: cats, loading: catLoading } = useSelector(state => state.categoryStore);
+  const { categories: cats, allCategories: allCats, loading: catLoading, pagination: catPagination } = useSelector(state => state.categoryStore);
 
   const [subCats, setSubCats] = useState(INIT_SUBCATS);
 
   // Local search + page state (we drive pagination ourselves)
   const [search, setSearch]   = useState('');
   const [page, setPage]       = useState(1);
+  const [catPage, setCatPage] = useState(1);
 
   const [productModal, setProductModal] = useState(null); // null | 'add' | 'edit'
   const [editProduct, setEditProduct]   = useState(null);
@@ -704,7 +706,11 @@ const Products = () => {
   }, [dispatch, page, search]);
 
   useEffect(() => {
-    dispatch(fetchAllCategories());
+    dispatch(fetchAllCategories(catPage, 5)); // 5 items per page for Category panel
+  }, [dispatch, catPage]);
+
+  useEffect(() => {
+    dispatch(fetchAllCategoriesList()); // full list for selects and mapping
   }, [dispatch]);
 
   /* ── Product CRUD ── */
@@ -825,7 +831,7 @@ const Products = () => {
     {
       key: 'name', label: 'Product',
       render: r => {
-        const cat = cats.find(c => c.id === r.category);
+        const cat = allCats.find(c => (c._id || c.id) === r.category);
         const sub = subCats.find(s => s.id === r.subCategory);
         return (
           <div className="d-flex align-items-center gap-3">
@@ -1028,7 +1034,7 @@ const Products = () => {
 
           {cats.map(cat => (
             <CategoryRow
-              key={cat.id}
+              key={cat._id || cat.id}
               cat={cat}
               subCats={subCats}
               onEditCat={openEditCat}
@@ -1041,6 +1047,34 @@ const Products = () => {
 
           {cats.length === 0 && (
             <div className="nm-empty-state"><span className="material-symbols-outlined">folder_off</span><p>No categories yet.</p></div>
+          )}
+
+          {/* Category Pagination controls */}
+          {catPagination?.totalPages > 1 && (
+            <div className="d-flex align-items-center justify-content-between mt-3 pt-3"
+              style={{ borderTop: '1px solid var(--outline-variant)' }}>
+              <span style={{ fontSize: 13, color: 'var(--secondary)' }}>
+                Page {catPagination.currentPage} of {catPagination.totalPages}
+              </span>
+              <div className="d-flex gap-2">
+                <button
+                  className="nm-btn nm-btn-secondary nm-btn-sm"
+                  onClick={() => setCatPage(p => Math.max(1, p - 1))}
+                  disabled={catPage <= 1 || catLoading}
+                >
+                  <span className="material-symbols-outlined">chevron_left</span>
+                  Prev
+                </button>
+                <button
+                  className="nm-btn nm-btn-secondary nm-btn-sm"
+                  onClick={() => setCatPage(p => Math.min(catPagination.totalPages, p + 1))}
+                  disabled={catPage >= catPagination.totalPages || catLoading}
+                >
+                  Next
+                  <span className="material-symbols-outlined">chevron_right</span>
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -1064,7 +1098,7 @@ const Products = () => {
         }
       >
         <form id="product-form" onSubmit={saveProduct}>
-          <ProductForm form={productForm} setForm={setProductForm} cats={cats} subCats={subCats} />
+          <ProductForm form={productForm} setForm={setProductForm} cats={allCats} subCats={subCats} />
         </form>
       </Modal>
 
@@ -1135,7 +1169,7 @@ const Products = () => {
             <select className="nm-select" value={subForm.category}
               onChange={e => setSubForm(f => ({ ...f, category: e.target.value }))} required>
               <option value="">Select…</option>
-              {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {allCats.map(c => <option key={c._id || c.id} value={c._id || c.id}>{c.name}</option>)}
             </select>
           </div>
           <div>
