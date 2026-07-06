@@ -1,7 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
+import {
+  fetchAllProducts,
+  addProduct,
+  updateProduct as updateProductAction,
+  deleteProduct as deleteProductAction,
+  updateStatus as updateStatusAction,
+  updateStock as updateStockAction,
+} from '../features/product/productAction';
 
 /* ─────────────────────────────────────────────────────────────
    STATIC MOCK DATA  (matches backend schema exactly)
@@ -520,15 +529,154 @@ const ProductForm = ({ form, setForm, cats, subCats }) => {
   );
 };
 
-/* ─── Main Products Page ────────────────────────────────────── */
+/* ─── Inline Stock Editor ────────────────────────────────────── */
+// The backend updateStock uses $inc, so we send the delta (new - current).
+const InlineStockEditor = ({ product, onUpdate }) => {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue]     = useState(String(product.stock ?? 0));
+  const [status, setStatus]   = useState(null); // null | 'saving' | 'saved' | 'error'
+  const inputRef = useRef();
+
+  // Sync if product stock changes externally
+  React.useEffect(() => {
+    if (!editing) setValue(String(product.stock ?? 0));
+  }, [product.stock, editing]);
+
+  const commit = async () => {
+    const newStock  = parseInt(value, 10);
+    const currStock = product.stock ?? 0;
+    if (isNaN(newStock) || newStock < 0) {
+      setValue(String(currStock));
+      setEditing(false);
+      return;
+    }
+    const delta = newStock - currStock;
+    if (delta === 0) { setEditing(false); return; }
+    if (delta < 0) {
+      // Backend only allows positive increments — show quick error
+      setStatus('error');
+      setTimeout(() => { setStatus(null); setValue(String(currStock)); setEditing(false); }, 1800);
+      return;
+    }
+    setStatus('saving');
+    try {
+      const res = await onUpdate(product._id || product.id, { quantity: delta });
+      if (res) {
+        setStatus('saved');
+        setTimeout(() => setStatus(null), 1500);
+      } else {
+        setStatus('error');
+        setTimeout(() => setStatus(null), 1800);
+      }
+    } catch {
+      setStatus('error');
+      setTimeout(() => setStatus(null), 1800);
+    }
+    setEditing(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { setValue(String(product.stock ?? 0)); setEditing(false); }
+  };
+
+  const outOfStock = (product.stock ?? 0) === 0;
+
+  if (status === 'saving') {
+    return (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: 'var(--secondary)' }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 15 }}>hourglass_top</span>
+        Saving…
+      </span>
+    );
+  }
+  if (status === 'saved') {
+    return (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: 'var(--tertiary, #16a34a)', fontWeight: 700 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
+        {product.stock}
+      </span>
+    );
+  }
+  if (status === 'error') {
+    return (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--error)', fontWeight: 600 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 15 }}>error</span>
+        Can only increase
+      </span>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {editing ? (
+        <input
+          ref={inputRef}
+          type="number"
+          min="0"
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onBlur={commit}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          style={{
+            width: 72, padding: '3px 8px', fontSize: 13, fontWeight: 700,
+            border: '2px solid var(--primary-container)',
+            borderRadius: 6, outline: 'none',
+            background: 'var(--surface-container-low)',
+            color: 'var(--on-surface)',
+          }}
+        />
+      ) : (
+        <span
+          onClick={() => setEditing(true)}
+          title="Click to edit stock"
+          style={{
+            fontWeight: 700, fontSize: 13, cursor: 'text',
+            padding: '3px 8px', borderRadius: 6,
+            border: '1px dashed transparent',
+            color: outOfStock ? 'var(--error)' : 'inherit',
+            display: 'flex', alignItems: 'center', gap: 5,
+            transition: 'border-color 0.15s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--outline)'}
+          onMouseLeave={e => e.currentTarget.style.borderColor = 'transparent'}
+        >
+          {outOfStock && <span className="material-symbols-outlined" style={{ fontSize: 15 }}>warning</span>}
+          {outOfStock ? 'Out of Stock' : product.stock}
+        </span>
+      )}
+      {!editing && (
+        <button
+          className="nm-action-btn"
+          title="Edit stock"
+          style={{ width: 22, height: 22, flexShrink: 0 }}
+          onClick={() => { setEditing(true); }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>
+        </button>
+      )}
+    </div>
+  );
+};
+
+
 const Products = () => {
-  const [products, setProducts] = useState(INIT_PRODUCTS);
-  const [cats, setCats]         = useState(INIT_CATS);
-  const [subCats, setSubCats]   = useState(INIT_SUBCATS);
+  const dispatch = useDispatch();
+  const { products, loading, pagination } = useSelector(state => state.productStore);
+
+  const [cats, setCats]       = useState(INIT_CATS);
+  const [subCats, setSubCats] = useState(INIT_SUBCATS);
+
+  // Local search + page state (we drive pagination ourselves)
+  const [search, setSearch]   = useState('');
+  const [page, setPage]       = useState(1);
 
   const [productModal, setProductModal] = useState(null); // null | 'add' | 'edit'
   const [editProduct, setEditProduct]   = useState(null);
   const [productForm, setProductForm]   = useState(BLANK);
+  const [saving, setSaving]             = useState(false);
+  const [toast, setToast]               = useState(null); // { type: 'success'|'error', msg }
 
   const [catModal, setCatModal]   = useState(null); // null | 'cat' | 'sub'
   const [editCat, setEditCat]     = useState(null);
@@ -537,13 +685,25 @@ const Products = () => {
   const [catForm, setCatForm]   = useState({ name: '', image: '', isActive: true });
   const [subForm, setSubForm]   = useState({ name: '', image: '', category: '', isActive: true });
 
+  /* ── Show toast ── */
+  const showToast = useCallback((type, msg) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  /* ── Fetch on mount and whenever page/search changes ── */
+  useEffect(() => {
+    dispatch(fetchAllProducts(page, 10, search));
+  }, [dispatch, page, search]);
+
   /* ── Product CRUD ── */
   const openAddProduct  = () => { setProductForm({ ...BLANK }); setEditProduct(null); setProductModal('add'); };
   const openEditProduct = (p) => { setEditProduct(p); setProductForm({ ...p }); setProductModal('edit'); };
-  const closeProductModal = () => { setProductModal(null); setEditProduct(null); };
+  const closeProductModal = () => { setProductModal(null); setEditProduct(null); setSaving(false); };
 
-  const saveProduct = (e) => {
+  const saveProduct = async (e) => {
     e.preventDefault();
+    setSaving(true);
     const data = {
       ...productForm,
       basePrice: parseFloat(productForm.basePrice) || 0,
@@ -551,16 +711,42 @@ const Products = () => {
       stock: parseInt(productForm.stock, 10) || 0,
       slug: productForm.name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-'),
     };
-    if (productModal === 'add') {
-      setProducts(prev => [{ ...data, id: `p${Date.now()}`, rating: 0, reviewCount: 0 }, ...prev]);
-    } else {
-      setProducts(prev => prev.map(p => p.id === editProduct.id ? { ...p, ...data } : p));
+    try {
+      let res;
+      if (productModal === 'add') {
+        res = await dispatch(addProduct(data));
+      } else {
+        res = await dispatch(updateProductAction(editProduct._id || editProduct.id, data));
+      }
+      if (res) {
+        showToast('success', productModal === 'add' ? 'Product added!' : 'Product updated!');
+        closeProductModal();
+      }
+    } catch {
+      showToast('error', 'Something went wrong. Please try again.');
+    } finally {
+      setSaving(false);
     }
-    closeProductModal();
   };
 
-  const deleteProduct = (id) => {
-    if (window.confirm('Delete this product?')) setProducts(prev => prev.filter(p => p.id !== id));
+  const handleDeleteProduct = async (id) => {
+    if (!window.confirm('Delete this product?')) return;
+    try {
+      const res = await dispatch(deleteProductAction(id));
+      if (res) showToast('success', 'Product deleted.');
+    } catch {
+      showToast('error', 'Could not delete product.');
+    }
+  };
+
+  const handleToggleStatus = async (product) => {
+    try {
+      const newStatus = !product.isActive;
+      const res = await dispatch(updateStatusAction(product._id || product.id, { isActive: newStatus }));
+      if (res) showToast('success', `Product ${newStatus ? 'activated' : 'deactivated'}.`);
+    } catch {
+      showToast('error', 'Could not update status.');
+    }
   };
 
   /* ── Category CRUD ── */
@@ -655,25 +841,35 @@ const Products = () => {
     },
     {
       key: 'stock', label: 'Stock',
-      render: r => r.stock === 0
-        ? <span style={{ color: 'var(--error)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>warning</span>Out of Stock
-          </span>
-        : <span style={{ fontWeight: 600 }}>{r.stock}</span>
+      render: r => (
+        <InlineStockEditor
+          product={r}
+          onUpdate={(id, data) => dispatch(updateStockAction(id, data))}
+        />
+      )
     },
     {
       key: 'rating', label: 'Rating',
       render: r => (
         <div className="d-flex align-items-center gap-1">
           <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#FACC15', fontVariationSettings: "'FILL' 1" }}>star</span>
-          <span style={{ fontWeight: 700, fontSize: 14 }}>{r.rating.toFixed(1)}</span>
-          <span style={{ fontSize: 12, color: 'var(--secondary)' }}>({r.reviewCount})</span>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>{(r.rating ?? 0).toFixed(1)}</span>
+          <span style={{ fontSize: 12, color: 'var(--secondary)' }}>({r.reviewCount ?? 0})</span>
         </div>
       )
     },
     {
       key: 'isActive', label: 'Status',
-      render: r => <StatusBadge status={r.isActive ? 'Active' : 'Inactive'} />
+      render: r => (
+        <button
+          className="nm-btn nm-btn-ghost nm-btn-sm"
+          style={{ padding: 0, background: 'none', border: 'none' }}
+          title={r.isActive ? 'Click to deactivate' : 'Click to activate'}
+          onClick={() => handleToggleStatus(r)}
+        >
+          <StatusBadge status={r.isActive ? 'Active' : 'Inactive'} />
+        </button>
+      )
     },
     {
       key: 'actions', label: 'Actions', sortable: false,
@@ -682,7 +878,7 @@ const Products = () => {
           <button className="nm-action-btn" title="Edit product" onClick={() => openEditProduct(r)}>
             <span className="material-symbols-outlined">edit</span>
           </button>
-          <button className="nm-action-btn danger" title="Delete product" onClick={() => deleteProduct(r.id)}>
+          <button className="nm-action-btn danger" title="Delete product" onClick={() => handleDeleteProduct(r._id || r.id)}>
             <span className="material-symbols-outlined">delete</span>
           </button>
         </div>
@@ -691,27 +887,96 @@ const Products = () => {
   ];
 
   return (
-    <div className="row g-4">
+    <div className="row g-4" style={{ position: 'relative' }}>
+
+      {/* ── Toast notification ── */}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: 20, right: 24, zIndex: 9999,
+          background: toast.type === 'success' ? 'var(--primary-container)' : 'var(--error)',
+          color: '#fff', borderRadius: 10, padding: '12px 20px',
+          display: 'flex', alignItems: 'center', gap: 10,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+        }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+            {toast.type === 'success' ? 'check_circle' : 'error'}
+          </span>
+          {toast.msg}
+        </div>
+      )}
+
       {/* ── LEFT: Product Table ──────────────────────────────── */}
       <div className="col-12 col-xl-7">
         <div className="nm-card nm-card-padding">
-          <div className="d-flex justify-content-between align-items-center mb-4">
+          <div className="d-flex justify-content-between align-items-center mb-3">
             <div>
               <h3 className="nm-page-section-title">Product Catalogue</h3>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--secondary)' }}>{products.length} products</p>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--secondary)' }}>
+                {loading ? 'Loading…' : `${pagination.totalItems} products`}
+              </p>
             </div>
-            <button className="nm-btn nm-btn-primary" onClick={openAddProduct}>
+            <button className="nm-btn nm-btn-primary" onClick={openAddProduct} disabled={loading}>
               <span className="material-symbols-outlined">add</span>
               Add Product
             </button>
           </div>
+
+          {/* Server-side search */}
+          <div className="mb-3" style={{ position: 'relative' }}>
+            <span className="material-symbols-outlined" style={{
+              position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+              color: 'var(--secondary)', fontSize: 20, pointerEvents: 'none',
+            }}>search</span>
+            <input
+              className="nm-input"
+              style={{ paddingLeft: 40 }}
+              placeholder="Search products, brands…"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+            />
+            {loading && (
+              <span className="material-symbols-outlined" style={{
+                position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
+                color: 'var(--secondary)', fontSize: 18,
+              }}>hourglass_top</span>
+            )}
+          </div>
+
           <DataTable
             columns={COLS}
             data={products}
-            searchFields={['name', 'brand', 'description']}
-            placeholder="Search products, brands…"
-            pageSize={5}
+            searchFields={[]}
+            placeholder=""
+            pageSize={pagination.limit || 10}
           />
+
+          {/* Pagination controls */}
+          {pagination.totalPages > 1 && (
+            <div className="d-flex align-items-center justify-content-between mt-3 pt-3"
+              style={{ borderTop: '1px solid var(--outline-variant)' }}>
+              <span style={{ fontSize: 13, color: 'var(--secondary)' }}>
+                Page {pagination.currentPage} of {pagination.totalPages}
+              </span>
+              <div className="d-flex gap-2">
+                <button
+                  className="nm-btn nm-btn-secondary nm-btn-sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page <= 1 || loading}
+                >
+                  <span className="material-symbols-outlined">chevron_left</span>
+                  Prev
+                </button>
+                <button
+                  className="nm-btn nm-btn-secondary nm-btn-sm"
+                  onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                  disabled={page >= pagination.totalPages || loading}
+                >
+                  Next
+                  <span className="material-symbols-outlined">chevron_right</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -756,9 +1021,12 @@ const Products = () => {
         size="lg"
         footer={
           <>
-            <button className="nm-btn nm-btn-secondary" onClick={closeProductModal}>Cancel</button>
-            <button className="nm-btn nm-btn-primary" form="product-form" type="submit">
-              {productModal === 'add' ? 'Save Product' : 'Update Product'}
+            <button className="nm-btn nm-btn-secondary" onClick={closeProductModal} disabled={saving}>Cancel</button>
+            <button className="nm-btn nm-btn-primary" form="product-form" type="submit" disabled={saving}>
+              {saving
+                ? <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>hourglass_top</span> Saving…</>
+                : productModal === 'add' ? 'Save Product' : 'Update Product'
+              }
             </button>
           </>
         }
