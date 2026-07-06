@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -8,30 +8,57 @@ import Orders from './pages/Orders';
 import Reviews from './pages/Reviews';
 import Deals from './pages/Deals';
 import Refunds from './pages/Refunds';
-import { useDispatch } from 'react-redux';
+import LoadingSpinner from './components/ui/LoadingSpinner';
+import { useDispatch, useSelector } from 'react-redux';
 import { autoLogin } from './features/admin/adminAction';
 
-function App() {
-const dispatch = useDispatch();
+// Protected Route Wrapper: Redirects to login if not authenticated
+const ProtectedRoute = () => {
+  const { user, loading } = useSelector((state) => state.adminStore);
+  const token = localStorage.getItem("accessToken");
 
-useEffect(()=>{
-  dispatch(autoLogin())
-},[dispatch])
+  if (loading || (token && !user)) {
+    return <LoadingSpinner fullPage />;
+  }
+
+  return user ? <Outlet /> : <Navigate to="/" replace />;
+};
+
+// Public Route Wrapper: Redirects to dashboard if already authenticated
+const PublicRoute = () => {
+  const { user, loading } = useSelector((state) => state.adminStore);
+  const token = localStorage.getItem("accessToken");
+
+  if (loading || (token && !user)) {
+    return <LoadingSpinner fullPage />;
+  }
+
+  return user ? <Navigate to="/dashboard" replace /> : <Login />;
+};
+
+function App() {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(autoLogin());
+  }, [dispatch]);
 
   return (
     <BrowserRouter>
       <Routes>
         {/* Public Login View */}
-        <Route path="/" element={<Login />} />
+        <Route path="/" element={<PublicRoute />} />
         
         {/* Administrative Layout Scaffolding Shell */}
-        <Route element={<Layout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/reviews" element={<Reviews />} />
-          <Route path="/deals" element={<Deals />} />
-          <Route path="/refunds" element={<Refunds />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/reviews" element={<Reviews />} />
+            <Route path="/deals" element={<Deals />} />
+            <Route path="/refunds" element={<Refunds />} />
+          </Route>
         </Route>
         
         {/* Wildcard Fallback redirection */}

@@ -11,6 +11,12 @@ import {
   updateStatus as updateStatusAction,
   updateStock as updateStockAction,
 } from '../features/product/productAction';
+import {
+  fetchAllCategories,
+  createCategory as createCategoryAction,
+  updateCategory as updateCategoryAction,
+  deleteCategory as deleteCategoryAction,
+} from '../features/category/categoryAction';
 
 /* ─────────────────────────────────────────────────────────────
    STATIC MOCK DATA  (matches backend schema exactly)
@@ -665,7 +671,8 @@ const Products = () => {
   const dispatch = useDispatch();
   const { products, loading, pagination } = useSelector(state => state.productStore);
 
-  const [cats, setCats]       = useState(INIT_CATS);
+  const { categories: cats, loading: catLoading } = useSelector(state => state.categoryStore);
+
   const [subCats, setSubCats] = useState(INIT_SUBCATS);
 
   // Local search + page state (we drive pagination ourselves)
@@ -691,10 +698,14 @@ const Products = () => {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
-  /* ── Fetch on mount and whenever page/search changes ── */
+  /* ── Fetch products + categories on mount ── */
   useEffect(() => {
     dispatch(fetchAllProducts(page, 10, search));
   }, [dispatch, page, search]);
+
+  useEffect(() => {
+    dispatch(fetchAllCategories());
+  }, [dispatch]);
 
   /* ── Product CRUD ── */
   const openAddProduct  = () => { setProductForm({ ...BLANK }); setEditProduct(null); setProductModal('add'); };
@@ -750,21 +761,42 @@ const Products = () => {
   };
 
   /* ── Category CRUD ── */
-  const openAddCat  = () => { setCatForm({ name: '', image: '', isActive: true }); setEditCat(null); setCatModal('cat'); };
-  const openEditCat = (c) => { setCatForm({ name: c.name, image: c.image, isActive: c.isActive }); setEditCat(c); setCatModal('cat'); };
-  const saveCat = (e) => {
-    e.preventDefault();
-    if (editCat) {
-      setCats(prev => prev.map(c => c.id === editCat.id ? { ...c, ...catForm } : c));
-    } else {
-      setCats(prev => [...prev, { id: `cat${Date.now()}`, ...catForm, slug: catForm.name.toLowerCase().replace(/\s+/g, '-') }]);
-    }
-    setCatModal(null);
+  const openAddCat  = () => { setCatForm({ name: '', slug: '', image: '', isActive: true }); setEditCat(null); setCatModal('cat'); };
+  const openEditCat = (c) => {
+    setCatForm({ name: c.name, slug: c.slug || '', image: c.image, isActive: c.isActive });
+    setEditCat(c);
+    setCatModal('cat');
   };
-  const deleteCat = (id) => {
-    if (!window.confirm('Delete category and its sub-categories?')) return;
-    setCats(prev => prev.filter(c => c.id !== id));
-    setSubCats(prev => prev.filter(s => s.category !== id));
+
+  const saveCat = async (e) => {
+    e.preventDefault();
+    const data = {
+      ...catForm,
+      slug: catForm.slug || catForm.name.toLowerCase().trim().replace(/\s+/g, '-'),
+    };
+    try {
+      let res;
+      if (editCat) {
+        res = await dispatch(updateCategoryAction(editCat._id || editCat.id, data));
+        if (res) showToast('success', 'Category updated!');
+      } else {
+        res = await dispatch(createCategoryAction(data));
+        if (res) showToast('success', 'Category created!');
+      }
+      if (res) setCatModal(null);
+    } catch {
+      showToast('error', 'Could not save category.');
+    }
+  };
+
+  const deleteCat = async (id) => {
+    if (!window.confirm('Delete this category? (It will be deactivated)')) return;
+    try {
+      const res = await dispatch(deleteCategoryAction(id));
+      if (res) showToast('success', 'Category deactivated.');
+    } catch {
+      showToast('error', 'Could not delete category.');
+    }
   };
 
   /* ── Sub-category CRUD ── */
@@ -1055,11 +1087,28 @@ const Products = () => {
           <div>
             <label className="nm-label">Category Name *</label>
             <input className="nm-input" placeholder="e.g. Footwear" value={catForm.name}
-              onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} required />
+              onChange={e => {
+                const name = e.target.value;
+                setCatForm(f => ({
+                  ...f,
+                  name,
+                  // auto-generate slug only if user hasn't manually edited it
+                  slug: f._slugEdited ? f.slug : name.toLowerCase().trim().replace(/\s+/g, '-'),
+                }));
+              }} required />
+          </div>
+          <div>
+            <label className="nm-label">Slug *</label>
+            <input className="nm-input" placeholder="e.g. footwear" value={catForm.slug || ''}
+              onChange={e => setCatForm(f => ({ ...f, slug: e.target.value, _slugEdited: true }))}
+              required />
+            <span style={{ fontSize: 11, color: 'var(--secondary)', marginTop: 3, display: 'block' }}>
+              Auto-generated from name. Edit if needed.
+            </span>
           </div>
           <ImagePicker value={catForm.image} onChange={v => setCatForm(f => ({ ...f, image: v }))} label="Category Image" size={72} />
           <label className="d-flex align-items-center gap-2" style={{ cursor: 'pointer', fontSize: 14 }}>
-            <input type="checkbox" checked={catForm.isActive} onChange={e => setCatForm(f => ({ ...f, isActive: e.target.checked }))} />
+            <input type="checkbox" checked={!!catForm.isActive} onChange={e => setCatForm(f => ({ ...f, isActive: e.target.checked }))} />
             <span style={{ fontWeight: 600 }}>Active</span>
           </label>
         </form>
