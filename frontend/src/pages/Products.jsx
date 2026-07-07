@@ -132,7 +132,7 @@ const CategoryRow = ({ cat, subCats, onEditCat, onDeleteCat, onEditSub, onDelete
           <button className="nm-action-btn" title="Edit" onClick={() => onEditCat(cat)}>
             <span className="material-symbols-outlined">edit</span>
           </button>
-          <button className="nm-action-btn danger" title="Delete" onClick={() => onDeleteCat(cat.id)}>
+          <button className="nm-action-btn danger" title="Delete" onClick={() => onDeleteCat(cat._id || cat.id)}>
             <span className="material-symbols-outlined">delete</span>
           </button>
         </div>
