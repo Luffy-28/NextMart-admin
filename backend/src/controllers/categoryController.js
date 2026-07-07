@@ -1,5 +1,21 @@
 import { Category } from "../models/categoryModel.js";
 
+export const uploadCategoryImageHandler = (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ status: "error", message: "No image file provided" });
+    }
+    return res.status(200).json({
+      status: "success",
+      message: "Category image uploaded successfully",
+      url: req.file.location, // S3 URL from multer-s3
+    });
+  } catch (error) {
+    console.error("uploadCategoryImageHandler error:", error);
+    return res.status(500).json({ status: "error", message: "Error uploading image" });
+  }
+};
+
 // get all the category
 export const getAllCategory = async (req, res) => {
   try {
@@ -35,10 +51,12 @@ export const getAllCategory = async (req, res) => {
 };
 
 // create category
-
 export const createCategory = async (req, res) => {
   try {
-    const { name, slug, image, isActive } = req.body;
+    const { name, slug, isActive } = req.body;
+    // Image can come from multipart upload (req.file) or JSON body (req.body.image)
+    const image = req.file ? req.file.location : req.body.image;
+
     if (!name || !slug || !image || isActive === undefined) {
       return res.status(400).send({
         status: "error",
@@ -72,7 +90,10 @@ export const createCategory = async (req, res) => {
 export const updateCategory = async (req, res) => {
   try {
     const { catId } = req.params;
-    const { name, slug, image, isActive } = req.body;
+    const { name, slug, isActive } = req.body;
+    // Image can come from multipart upload (req.file) or JSON body (req.body.image)
+    const image = req.file ? req.file.location : req.body.image;
+
     if (!name || !slug || !image || isActive === undefined) {
       return res.status(400).send({
         status: "error",

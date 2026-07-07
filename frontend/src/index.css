@@ -848,3 +848,9 @@ body {
   border-radius: 50%;
   border: 2px solid white;
 }
+
+/* Upload spinner */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

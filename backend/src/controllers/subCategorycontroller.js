@@ -1,6 +1,23 @@
-import { SubCategory } from "../models/subCategoryModel.js";
+  import { SubCategory } from "../models/subCategoryModel.js";
 import { Category } from "../models/categoryModel.js";
 
+// ─── Dedicated image-upload endpoint for sub-categories ──────────────────
+// POST /subcategories/upload-image  (multipart, field: "image", single file)
+export const uploadSubCategoryImageHandler = (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ status: "error", message: "No image file provided" });
+    }
+    return res.status(200).json({
+      status: "success",
+      message: "Sub-category image uploaded successfully",
+      url: req.file.location, // S3 URL from multer-s3
+    });
+  } catch (error) {
+    console.error("uploadSubCategoryImageHandler error:", error);
+    return res.status(500).json({ status: "error", message: "Error uploading image" });
+  }
+};
 
 
 // get all subcategories
@@ -90,7 +107,9 @@ export const getSubCategoryById = async (req, res) => {
 // create sub category 
 export const createSubCategory = async (req, res) => {
  try {
-   const { name, image, category, isActive } = req.body;
+   const { name, category, isActive } = req.body;
+   // Image can come from multipart upload (req.file) or JSON body (req.body.image)
+   const image = req.file ? req.file.location : (req.body.image || "");
 
 
    if (!name || !category) {
@@ -126,7 +145,7 @@ export const createSubCategory = async (req, res) => {
 
    const subCategory = new SubCategory({
      name: name.trim(),
-     image: image || "",
+     image,
      category,
      isActive: isActive !== undefined ? isActive : true,
    });
@@ -154,7 +173,7 @@ export const createSubCategory = async (req, res) => {
      status: "error",
      message: "Error creating sub-category",
    });
- }
+ } 
 };
 
 
@@ -163,7 +182,9 @@ export const createSubCategory = async (req, res) => {
 export const updateSubCategory = async (req, res) => {
  try {
    const { subCatId } = req.params;
-   const { name, image, category, isActive } = req.body;
+   const { name, category, isActive } = req.body;
+   // Image can come from multipart upload (req.file) or JSON body (req.body.image)
+   const image = req.file ? req.file.location : req.body.image;
 
 
    const subCategory = await SubCategory.findById(subCatId);
@@ -214,7 +235,7 @@ export const updateSubCategory = async (req, res) => {
      status: "error",
      message: "Error updating sub-category",
    });
- }
+ } 
 };
 
 

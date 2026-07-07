@@ -58,3 +58,16 @@ export const deleteSubCategoryApi = async (subCatId) => {
     isPrivate: true,
   });
 };
+
+// upload sub-category image → returns { status, url } (S3 URL)
+export const uploadSubCategoryImageApi = async (file) => {
+  const formData = new FormData();
+  formData.append("image", file);
+  return apiProcessor({
+    url: `${BASE}/upload-image`,
+    method: "POST",
+    isPrivate: true,
+    data: formData,
+    contentType: "multipart/form-data",
+  });
+};

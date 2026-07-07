@@ -1,5 +1,5 @@
 import Product from "../models/productModel.js";
-import { createEmbedding,  } from "../helpers/geminaiHelper.js";
+import { createEmbedding } from "../helpers/geminaiHelper.js";
 
 
 
@@ -58,6 +58,24 @@ export const getAllProduct = async(req, res) =>{
     }
 }
 
+// ─── Dedicated image-upload endpoint for products ─────────────────────────────
+// POST /products/upload-image  (multipart, field: "image", single file)
+export const uploadProductImageHandler = (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ status: "error", message: "No image file provided" });
+        }
+        return res.status(200).json({
+            status: "success",
+            message: "Image uploaded successfully",
+            url: req.file.location, // S3 URL from multer-s3
+        });
+    } catch (error) {
+        console.error("uploadProductImageHandler error:", error);
+        return res.status(500).json({ status: "error", message: "Error uploading image" });
+    }
+};
+
 // create new products
 export const createNewProduct = async(req,res) =>{
     try {
@@ -68,6 +86,10 @@ export const createNewProduct = async(req,res) =>{
                 message:"productData is required",
                 
             })  
+        }
+        // If an image was uploaded via multipart (multer), attach the S3 URL
+        if (req.file) {
+            productData.image = req.file.location;
         }
         // generate embedding for the product
         const bookText = getProductTextForEmbedding(productData);
@@ -147,6 +169,10 @@ export const updateProduct = async(req,res) =>{
                 status:"error",
                 message:"product not found",
             })
+        }
+        // If a new image was uploaded via multipart, replace the image
+        if (req.file) {
+            updatedData.image = req.file.location;
         }
         const mergedBook = {...oldProduct.toObject(), ...updatedData};
         const bookText  = getProductTextForEmbedding(mergedBook);

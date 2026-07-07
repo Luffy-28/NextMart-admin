@@ -12,6 +12,9 @@ export const loginUser = (formData) => async (dispatch) => {
         dispatch(setError("No access token received from server."));
         return false;
       }
+      if (data.refreshToken) {
+        localStorage.setItem("refreshToken", data.refreshToken);
+      }
       const userResponse = await getUserDetailApis();
       if (userResponse.status === "success") {
         dispatch(setAdmin(userResponse.user));

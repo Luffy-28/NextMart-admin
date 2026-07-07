@@ -64,7 +64,7 @@ const productSchema = new mongoose.Schema(
       default: [],
     },
     tags: [{ type: String }],
-    images: [{ type: String }],
+    image: { type: String, default: "" },
 
     featured: {
       type: Boolean,

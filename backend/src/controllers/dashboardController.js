@@ -185,17 +185,23 @@ export const getBestSellingProducts = async (req, res) => {
          as: "productDetails",
        },
      },
-     {
-       $project: {
-         _id: 1,
-         name: 1,
-         image: { $ifNull: [{ $arrayElemAt: ["$productDetails.images", 0] }, "$image"] },
-         unitsSold: 1,
-         revenue: { $round: ["$revenue", 2] },
-         rating: { $arrayElemAt: ["$productDetails.rating", 0] },
-         stock: { $arrayElemAt: ["$productDetails.stock", 0] },
-       },
-     },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          // image is now a plain string on each product doc
+          image: {
+            $ifNull: [
+              { $arrayElemAt: ["$productDetails.image", 0] },
+              "$image",
+            ],
+          },
+          unitsSold: 1,
+          revenue: { $round: ["$revenue", 2] },
+          rating: { $arrayElemAt: ["$productDetails.rating", 0] },
+          stock: { $arrayElemAt: ["$productDetails.stock", 0] },
+        },
+      },
    ]);
 
 

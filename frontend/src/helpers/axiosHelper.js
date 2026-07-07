@@ -14,7 +14,13 @@ export const apiProcessor = async ({
       method,
       data,
       headers: {
-        "Content-Type": contentType ?? "application/json",
+        // For multipart/form-data, do NOT set Content-Type manually —
+        // axios must auto-set it so it includes the required boundary string.
+        ...(contentType && contentType !== "multipart/form-data"
+          ? { "Content-Type": contentType }
+          : contentType === "multipart/form-data"
+          ? {}  // let axios set it
+          : { "Content-Type": "application/json" }),
         Authorization: isPrivate
           ? isRefresh
             ? `Bearer ${localStorage.getItem("refreshToken")}`
@@ -45,10 +51,21 @@ export const apiProcessor = async ({
         return apiProcessor({
           url,
           method,
+          data,
+          contentType,
           isPrivate,
           isRefresh,
         });
+      } else {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
       }
+    }
+
+    // Also clear tokens for any other unhandled 401 errors
+    if (error?.response?.status === 401) {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
     }
 
     return {

@@ -25,6 +25,9 @@ import {
   toggleSubCategoryStatus as toggleSubCategoryStatusAction,
   deleteSubCategory as deleteSubCategoryAction,
 } from '../features/subCategory/subCategoryActions';
+import { uploadCategoryImageApi } from '../features/category/categoryApis';
+import { uploadSubCategoryImageApi } from '../features/subCategory/subCategoryApi';
+import { uploadProductImageApi } from '../features/product/productApis';
 
 
 const BLANK = {
@@ -36,52 +39,81 @@ const BLANK = {
   features: [],
   specifications: [],
   tags: [],
-  images: [],
+  image: '',
   featured: false,
   isActive: true,
   metaTitle: '', metaDescription: '',
 };
 
-/* ─── Image picker ──────────────────────────────────────────── */
-const ImagePicker = ({ value, onChange, size = 80, label = 'Image' }) => {
+/* ─── Image picker ────────────────────────────────────── */
+// uploadFn: (file: File) => Promise<string>  — must return the final public URL
+const ImagePicker = ({ value, onChange, uploadFn, size = 80, label = 'Image' }) => {
   const ref = useRef();
-  const handleFile = (e) => {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+
+  const handleFile = async (e) => {
     const f = e.target.files[0];
-    if (f) onChange(URL.createObjectURL(f));
+    if (!f) return;
+    e.target.value = ''; // reset so same file can be re-selected
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const url = await uploadFn(f);  // upload to S3, get back the public URL
+      onChange(url);
+    } catch (err) {
+      setUploadError('Upload failed. Try again.');
+    } finally {
+      setUploading(false);
+    }
   };
+
   return (
     <div>
       <label className="nm-label">{label}</label>
       <div className="d-flex align-items-center gap-3">
+        {/* Preview box */}
         <div
-          onClick={() => ref.current.click()}
+          onClick={() => !uploading && ref.current.click()}
           style={{
-            width: size, height: size, borderRadius: 8, cursor: 'pointer',
-            border: '2px dashed var(--outline-variant)',
+            width: size, height: size, borderRadius: 8,
+            cursor: uploading ? 'not-allowed' : 'pointer',
+            border: `2px dashed ${uploadError ? 'var(--error)' : 'var(--outline-variant)'}`,
             background: 'var(--surface-container-low)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            overflow: 'hidden', flexShrink: 0,
+            overflow: 'hidden', flexShrink: 0, position: 'relative',
           }}
-          title="Click to upload"
+          title={uploading ? 'Uploading…' : 'Click to upload'}
         >
-          {value
-            ? <img src={value} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span className="material-symbols-outlined" style={{ color: 'var(--outline)', fontSize: 26 }}>add_photo_alternate</span>
-          }
+          {uploading ? (
+            <span className="material-symbols-outlined" style={{ color: 'var(--primary-container)', fontSize: 26,
+              animation: 'spin 1s linear infinite' }}>progress_activity</span>
+          ) : value ? (
+            <img src={value} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <span className="material-symbols-outlined" style={{ color: 'var(--outline)', fontSize: 26 }}>add_photo_alternate</span>
+          )}
         </div>
+
+        {/* Buttons */}
         <div>
-          <button type="button" className="nm-btn nm-btn-secondary nm-btn-sm" onClick={() => ref.current.click()}>
-            <span className="material-symbols-outlined">upload</span>
-            {value ? 'Change' : 'Upload'}
+          <button type="button" className="nm-btn nm-btn-secondary nm-btn-sm"
+            onClick={() => ref.current.click()} disabled={uploading}>
+            <span className="material-symbols-outlined">{uploading ? 'hourglass_top' : 'upload'}</span>
+            {uploading ? 'Uploading…' : value ? 'Change' : 'Upload'}
           </button>
-          {value && (
+          {value && !uploading && (
             <button type="button" className="nm-btn nm-btn-ghost nm-btn-sm ms-1" onClick={() => onChange('')}>
               <span className="material-symbols-outlined" style={{ color: 'var(--error)', fontSize: 18 }}>delete</span>
             </button>
           )}
+          {uploadError && (
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--error)' }}>{uploadError}</p>
+          )}
         </div>
       </div>
-      <input ref={ref} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+      <input ref={ref} type="file" accept="image/jpeg,image/png,image/gif,image/webp,image/avif,image/svg+xml"
+        style={{ display: 'none' }} onChange={handleFile} />
     </div>
   );
 };
@@ -184,8 +216,6 @@ const ProductForm = ({ form, setForm, cats, subCats }) => {
   const [featureInput, setFeatureInput] = useState('');
   const [tagInput, setTagInput]         = useState('');
   const [specInput, setSpecInput]       = useState({ label: '', value: '' });
-  const imageRef = useRef();
-
   const set = (field, value) => setForm(f => ({ ...f, [field]: value }));
 
   const filteredSubs = subCats.filter(s => (s.category?._id || s.category) === form.category);
@@ -211,16 +241,6 @@ const ProductForm = ({ form, setForm, cats, subCats }) => {
   };
   const removeTag = (i) => set('tags', form.tags.filter((_, idx) => idx !== i));
 
-  const addImage = (url) => {
-    if (url) set('images', [...(form.images || []), url]);
-  };
-  const removeImage = (i) => set('images', form.images.filter((_, idx) => idx !== i));
-
-  const handleImageFile = (e) => {
-    const f = e.target.files[0];
-    if (f) addImage(URL.createObjectURL(f));
-    e.target.value = '';
-  };
 
   return (
     <div>
@@ -397,46 +417,20 @@ const ProductForm = ({ form, setForm, cats, subCats }) => {
         </div>
       )}
 
-      {/* ── Images ── */}
+      {/* ── Image ── */}
       {tab === 'Images' && (
         <div>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <label className="nm-label" style={{ margin: 0 }}>Product Images</label>
-            <button type="button" className="nm-btn nm-btn-secondary nm-btn-sm" onClick={() => imageRef.current.click()}>
-              <span className="material-symbols-outlined">add_photo_alternate</span>
-              Add Image
-            </button>
-          </div>
-          <input ref={imageRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageFile} />
-
-          {(form.images || []).length === 0 ? (
-            <div className="nm-empty-state" style={{ padding: '32px' }}>
-              <span className="material-symbols-outlined">photo_library</span>
-              <p style={{ margin: '8px 0 0', fontSize: 13 }}>No images uploaded yet. Click "Add Image" above.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
-              {(form.images || []).map((img, i) => (
-                <div key={i} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--outline-variant)', aspectRatio: '1' }}>
-                  <img src={img} alt={`product-${i}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  {i === 0 && (
-                    <span style={{
-                      position: 'absolute', top: 6, left: 6,
-                      background: 'var(--primary-container)', color: '#fff',
-                      fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 99, textTransform: 'uppercase'
-                    }}>Main</span>
-                  )}
-                  <button type="button" onClick={() => removeImage(i)} style={{
-                    position: 'absolute', top: 4, right: 4,
-                    background: 'rgba(186,26,26,0.85)', border: 'none', borderRadius: '50%',
-                    width: 22, height: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}>
-                    <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: 13 }}>close</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          <ImagePicker
+            value={form.image || ''}
+            onChange={v => set('image', v)}
+            uploadFn={async (file) => {
+              const resp = await uploadProductImageApi(file);
+              if (resp.status === 'success') return resp.url;
+              throw new Error(resp.message);
+            }}
+            label="Product Image"
+            size={120}
+          />
         </div>
       )}
 
@@ -787,8 +781,8 @@ const Products = () => {
               width: 52, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
               border: '1px solid var(--outline-variant)', background: 'var(--surface-container-low)'
             }}>
-              {(r.images && r.images[0])
-                ? <img src={r.images[0]} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {r.image
+                ? <img src={r.image} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span className="material-symbols-outlined" style={{ color: 'var(--secondary)', fontSize: 24 }}>inventory_2</span>
                   </div>
@@ -1088,7 +1082,17 @@ const Products = () => {
               Auto-generated from name. Edit if needed.
             </span>
           </div>
-          <ImagePicker value={catForm.image} onChange={v => setCatForm(f => ({ ...f, image: v }))} label="Category Image" size={72} />
+          <ImagePicker
+            value={catForm.image}
+            onChange={v => setCatForm(f => ({ ...f, image: v }))}
+            uploadFn={async (file) => {
+              const resp = await uploadCategoryImageApi(file);
+              if (resp.status === 'success') return resp.url;
+              throw new Error(resp.message);
+            }}
+            label="Category Image"
+            size={72}
+          />
           <label className="d-flex align-items-center gap-2" style={{ cursor: 'pointer', fontSize: 14 }}>
             <input type="checkbox" checked={!!catForm.isActive} onChange={e => setCatForm(f => ({ ...f, isActive: e.target.checked }))} />
             <span style={{ fontWeight: 600 }}>Active</span>
@@ -1125,7 +1129,17 @@ const Products = () => {
             <input className="nm-input" placeholder="e.g. Running" value={subForm.name}
               onChange={e => setSubForm(f => ({ ...f, name: e.target.value }))} required />
           </div>
-          <ImagePicker value={subForm.image} onChange={v => setSubForm(f => ({ ...f, image: v }))} label="Sub-Category Image" size={60} />
+          <ImagePicker
+            value={subForm.image}
+            onChange={v => setSubForm(f => ({ ...f, image: v }))}
+            uploadFn={async (file) => {
+              const resp = await uploadSubCategoryImageApi(file);
+              if (resp.status === 'success') return resp.url;
+              throw new Error(resp.message);
+            }}
+            label="Sub-Category Image"
+            size={60}
+          />
           <label className="d-flex align-items-center gap-2" style={{ cursor: 'pointer', fontSize: 14 }}>
             <input type="checkbox" checked={subForm.isActive} onChange={e => setSubForm(f => ({ ...f, isActive: e.target.checked }))} />
             <span style={{ fontWeight: 600 }}>Active</span>

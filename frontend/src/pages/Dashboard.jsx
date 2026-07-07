@@ -130,8 +130,8 @@ const PRODUCT_COLS = [
     key: 'name', label: 'Product',
     render: r => (
       <div className="d-flex align-items-center gap-3">
-        {r.image?.[0] ? (
-          <img src={r.image[0]} alt={r.name} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--outline-variant)' }} />
+        {r.image ? (
+          <img src={r.image} alt={r.name} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--outline-variant)' }} />
         ) : (
           <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--secondary)' }}>inventory_2</span>

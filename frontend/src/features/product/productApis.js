@@ -68,3 +68,15 @@ export const updateStatusApi = async(productId, status) =>{
     })
 }
 
+// upload product image → returns { status, url } (S3 URL)
+export const uploadProductImageApi = async (file) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    return apiProcessor({
+        url: `${import.meta.env.VITE_ROOT_URL}/api/v1/products/upload-image`,
+        method: 'POST',
+        isPrivate: true,
+        data: formData,
+        contentType: "multipart/form-data",
+    });
+};

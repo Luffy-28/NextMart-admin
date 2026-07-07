@@ -10,3 +10,14 @@ export const signToken = (payload) => {
 export const verifyToken = (token) => {
   return jwt.verify(token, config.jwt.secret);
 };
+
+export const signRefreshToken = (payload) => {
+  return jwt.sign(payload, config.jwtRefresh.secret, {
+    expiresIn: config.jwtRefresh.expiresIn,
+  });
+};
+
+export const verifyRefreshToken = (token) => {
+  return jwt.verify(token, config.jwtRefresh.secret);
+};
+
