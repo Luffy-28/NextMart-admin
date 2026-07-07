@@ -18,84 +18,15 @@ import {
   updateCategory as updateCategoryAction,
   deleteCategory as deleteCategoryAction,
 } from '../features/category/categoryAction';
+import {
+  fetchAllSubCategoriesList,
+  createSubCategory as createSubCategoryAction,
+  updateSubCategory as updateSubCategoryAction,
+  toggleSubCategoryStatus as toggleSubCategoryStatusAction,
+  deleteSubCategory as deleteSubCategoryAction,
+} from '../features/subCategory/subCategoryActions';
 
-/* ─────────────────────────────────────────────────────────────
-   STATIC MOCK DATA  (matches backend schema exactly)
-   Product: name, description, category, subCategory, brand,
-            basePrice, discountedPrice, stock, color, size,
-            features[], specifications[{label,value}], tags[],
-            images[], featured, isActive, rating, reviewCount,
-            metaTitle, metaDescription
-   Category: name, slug, image, isActive
-   SubCategory: name, slug, image, category (ref), isActive
-───────────────────────────────────────────────────────────────*/
-const INIT_CATS = [
-  { id: 'cat1', name: 'Footwear',    slug: 'footwear',    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=80&h=80&fit=crop', isActive: true },
-  { id: 'cat2', name: 'Electronics', slug: 'electronics', image: 'https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=80&h=80&fit=crop', isActive: true },
-  { id: 'cat3', name: 'Apparel',     slug: 'apparel',     image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=80&h=80&fit=crop', isActive: true },
-];
 
-const INIT_SUBCATS = [
-  { id: 'sc1', name: 'Running',      slug: 'running',      category: 'cat1', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=60&h=60&fit=crop', isActive: true },
-  { id: 'sc2', name: 'Sneakers',     slug: 'sneakers',     category: 'cat1', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=60&h=60&fit=crop', isActive: true },
-  { id: 'sc3', name: 'Smartwatches', slug: 'smartwatches', category: 'cat2', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=60&h=60&fit=crop', isActive: true },
-  { id: 'sc4', name: 'Earbuds',      slug: 'earbuds',      category: 'cat2', image: 'https://images.unsplash.com/photo-1606220838315-056192d5e927?w=60&h=60&fit=crop', isActive: true },
-  { id: 'sc5', name: 'Hoodies',      slug: 'hoodies',      category: 'cat3', image: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=60&h=60&fit=crop', isActive: true },
-  { id: 'sc6', name: 'Compression',  slug: 'compression',  category: 'cat3', image: 'https://images.unsplash.com/photo-1512146172765-3fb9d7ab6b8b?w=60&h=60&fit=crop', isActive: true },
-];
-
-const INIT_PRODUCTS = [
-  {
-    id: 'p1', name: 'Vapor Ultra Running Shoes', slug: 'vapor-ultra-running-shoes',
-    description: 'Premium running shoes with ultra-light foam sole and breathable mesh upper.',
-    category: 'cat1', subCategory: 'sc1', brand: 'VaporX', color: 'Black', size: '10',
-    basePrice: 149.99, discountedPrice: 129.99, stock: 45,
-    features: ['Ultra-light foam', 'Mesh upper', 'Reflective trim'],
-    specifications: [{ label: 'Weight', value: '220g' }, { label: 'Drop', value: '8mm' }],
-    tags: ['running', 'athletic', 'lightweight'],
-    images: ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=160&h=160&fit=crop'],
-    featured: true, isActive: true, rating: 4.5, reviewCount: 128,
-    metaTitle: 'Vapor Ultra Running Shoes', metaDescription: 'Buy Vapor Ultra Running Shoes',
-  },
-  {
-    id: 'p2', name: 'Chronos Smartwatch Gen 5', slug: 'chronos-smartwatch-gen-5',
-    description: 'Next-gen smartwatch with health tracking, GPS, and 7-day battery life.',
-    category: 'cat2', subCategory: 'sc3', brand: 'Chronos', color: 'Space Gray', size: '44mm',
-    basePrice: 299.00, discountedPrice: null, stock: 18,
-    features: ['GPS tracking', 'Heart rate monitor', '7-day battery'],
-    specifications: [{ label: 'Display', value: 'AMOLED 1.4"' }, { label: 'Water Resistance', value: '5 ATM' }],
-    tags: ['smartwatch', 'wearable', 'fitness'],
-    images: ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=160&h=160&fit=crop'],
-    featured: false, isActive: true, rating: 4.2, reviewCount: 67,
-    metaTitle: 'Chronos Smartwatch Gen 5', metaDescription: 'Buy Chronos Smartwatch Gen 5',
-  },
-  {
-    id: 'p3', name: 'AeroDry Hoodie Pro', slug: 'aerodry-hoodie-pro',
-    description: 'Moisture-wicking athletic hoodie built for training in all conditions.',
-    category: 'cat3', subCategory: 'sc5', brand: 'AeroDry', color: 'Charcoal', size: 'L',
-    basePrice: 79.99, discountedPrice: 64.99, stock: 32,
-    features: ['Quick-dry fabric', 'Kangaroo pocket', 'Fleece-lined'],
-    specifications: [{ label: 'Material', value: '90% Polyester, 10% Spandex' }, { label: 'Fit', value: 'Athletic Fit' }],
-    tags: ['hoodie', 'training', 'moisture-wicking'],
-    images: ['https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=160&h=160&fit=crop'],
-    featured: false, isActive: true, rating: 3.8, reviewCount: 34,
-    metaTitle: 'AeroDry Hoodie Pro', metaDescription: 'Buy AeroDry Hoodie Pro',
-  },
-  {
-    id: 'p4', name: 'Apex Bluetooth Earbuds', slug: 'apex-bluetooth-earbuds',
-    description: 'True wireless earbuds with active noise cancellation and 30-hour playback.',
-    category: 'cat2', subCategory: 'sc4', brand: 'Apex', color: 'White', size: null,
-    basePrice: 119.50, discountedPrice: null, stock: 0,
-    features: ['ANC', '30h battery', 'IPX5 water resistant'],
-    specifications: [{ label: 'Driver', value: '10mm Dynamic' }, { label: 'Codec', value: 'AAC, SBC' }],
-    tags: ['earbuds', 'wireless', 'anc'],
-    images: ['https://images.unsplash.com/photo-1606220838315-056192d5e927?w=160&h=160&fit=crop'],
-    featured: false, isActive: false, rating: 4.0, reviewCount: 21,
-    metaTitle: 'Apex Bluetooth Earbuds', metaDescription: 'Buy Apex Bluetooth Earbuds',
-  },
-];
-
-/* ─── Blank form matching schema ─────────────────────────────*/
 const BLANK = {
   name: '', description: '',
   category: '', subCategory: '',
@@ -158,7 +89,7 @@ const ImagePicker = ({ value, onChange, size = 80, label = 'Image' }) => {
 /* ─── Collapsible Category Row ──────────────────────────────── */
 const CategoryRow = ({ cat, subCats, onEditCat, onDeleteCat, onEditSub, onDeleteSub, onAddSub }) => {
   const [open, setOpen] = useState(false);
-  const mySubs = subCats.filter(s => s.category === (cat._id || cat.id));
+  const mySubs = subCats.filter(s => (s.category?._id || s.category) === (cat._id || cat.id));
 
   return (
     <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
@@ -216,7 +147,7 @@ const CategoryRow = ({ cat, subCats, onEditCat, onDeleteCat, onEditSub, onDelete
             </p>
           )}
           {mySubs.map(sub => (
-            <div key={sub.id} style={{
+            <div key={sub._id || sub.id} style={{
               border: '1px solid var(--outline-variant)', borderRadius: 8, padding: '8px 12px',
               display: 'flex', alignItems: 'center', gap: 10, background: 'white',
               boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
@@ -234,7 +165,7 @@ const CategoryRow = ({ cat, subCats, onEditCat, onDeleteCat, onEditSub, onDelete
               <button className="nm-action-btn" title="Edit" style={{ width: 24, height: 24 }} onClick={() => onEditSub(sub)}>
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
               </button>
-              <button className="nm-action-btn danger" title="Delete" style={{ width: 24, height: 24 }} onClick={() => onDeleteSub(sub.id)}>
+              <button className="nm-action-btn danger" title="Delete" style={{ width: 24, height: 24 }} onClick={() => onDeleteSub(sub._id || sub.id)}>
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
               </button>
             </div>
@@ -257,7 +188,7 @@ const ProductForm = ({ form, setForm, cats, subCats }) => {
 
   const set = (field, value) => setForm(f => ({ ...f, [field]: value }));
 
-  const filteredSubs = subCats.filter(s => s.category === form.category);
+  const filteredSubs = subCats.filter(s => (s.category?._id || s.category) === form.category);
 
   const addFeature = () => {
     if (!featureInput.trim()) return;
@@ -673,8 +604,7 @@ const Products = () => {
   const { products, loading, pagination } = useSelector(state => state.productStore);
 
   const { categories: cats, allCategories: allCats, loading: catLoading, pagination: catPagination } = useSelector(state => state.categoryStore);
-
-  const [subCats, setSubCats] = useState(INIT_SUBCATS);
+  const { allSubCategories: subCats } = useSelector(state => state.subCategoryStore);
 
   // Local search + page state (we drive pagination ourselves)
   const [search, setSearch]   = useState('');
@@ -711,6 +641,7 @@ const Products = () => {
 
   useEffect(() => {
     dispatch(fetchAllCategoriesList()); // full list for selects and mapping
+    dispatch(fetchAllSubCategoriesList()); // load all subcategories for rendering
   }, [dispatch]);
 
   /* ── Product CRUD ── */
@@ -807,23 +738,40 @@ const Products = () => {
 
   /* ── Sub-category CRUD ── */
   const openAddSub  = (parentCat) => {
-    setSubForm({ name: '', image: '', category: parentCat?.id || cats[0]?.id || '', isActive: true });
+    setSubForm({ name: '', image: '', category: parentCat?._id || parentCat?.id || allCats[0]?._id || allCats[0]?.id || '', isActive: true });
     setDefaultParent(parentCat);
     setEditSub(null);
     setCatModal('sub');
   };
-  const openEditSub = (s) => { setSubForm({ name: s.name, image: s.image, category: s.category, isActive: s.isActive }); setEditSub(s); setCatModal('sub'); };
-  const saveSub = (e) => {
+  const openEditSub = (s) => { setSubForm({ name: s.name, image: s.image, category: s.category?._id || s.category, isActive: s.isActive }); setEditSub(s); setCatModal('sub'); };
+  const saveSub = async (e) => {
     e.preventDefault();
-    if (editSub) {
-      setSubCats(prev => prev.map(s => s.id === editSub.id ? { ...s, ...subForm } : s));
-    } else {
-      setSubCats(prev => [...prev, { id: `sc${Date.now()}`, ...subForm, slug: subForm.name.toLowerCase().replace(/\s+/g, '-') }]);
+    const data = {
+      ...subForm,
+      slug: subForm.name.toLowerCase().trim().replace(/\s+/g, '-'),
+    };
+    try {
+      let res;
+      if (editSub) {
+        res = await dispatch(updateSubCategoryAction(editSub._id || editSub.id, data));
+        if (res) showToast('success', 'Sub-category updated!');
+      } else {
+        res = await dispatch(createSubCategoryAction(data));
+        if (res) showToast('success', 'Sub-category created!');
+      }
+      if (res) setCatModal(null);
+    } catch {
+      showToast('error', 'Could not save sub-category.');
     }
-    setCatModal(null);
   };
-  const deleteSub = (id) => {
-    if (!window.confirm('Delete this sub-category?')) setSubCats(prev => prev.filter(s => s.id !== id));
+  const deleteSub = async (id) => {
+    if (!window.confirm('Delete this sub-category?')) return;
+    try {
+      const res = await dispatch(deleteSubCategoryAction(id));
+      if (res) showToast('success', 'Sub-category deleted.');
+    } catch {
+      showToast('error', 'Could not delete sub-category.');
+    }
   };
 
   /* ── Table columns ── */
@@ -832,7 +780,7 @@ const Products = () => {
       key: 'name', label: 'Product',
       render: r => {
         const cat = allCats.find(c => (c._id || c.id) === r.category);
-        const sub = subCats.find(s => s.id === r.subCategory);
+        const sub = subCats.find(s => (s._id || s.id) === r.subCategory);
         return (
           <div className="d-flex align-items-center gap-3">
             <div style={{
