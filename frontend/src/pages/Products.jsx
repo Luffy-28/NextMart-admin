@@ -617,6 +617,7 @@ const Products = () => {
   const [defaultParent, setDefaultParent] = useState(null);
   const [catForm, setCatForm]   = useState({ name: '', image: '', isActive: true });
   const [subForm, setSubForm]   = useState({ name: '', image: '', category: '', isActive: true });
+  const [activeTab, setActiveTab] = useState('products'); // 'products' | 'categories'
 
   /* ── Show toast ── */
   const showToast = useCallback((type, msg) => {
@@ -866,8 +867,12 @@ const Products = () => {
     }
   ];
 
+  const totalProducts = pagination?.totalItems || 0;
+  const lowStockCount = products?.filter(p => (p.stock ?? 0) <= 5).length || 0;
+  const categoriesCount = allCats?.length || 0;
+
   return (
-    <div className="row g-4" style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', width: '100%' }}>
 
       {/* ── Toast notification ── */}
       {toast && (
@@ -885,141 +890,209 @@ const Products = () => {
         </div>
       )}
 
-      {/* ── LEFT: Product Table ──────────────────────────────── */}
-      <div className="col-12 col-xl-7">
-        <div className="nm-card nm-card-padding">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <div>
-              <h3 className="nm-page-section-title">Product Catalogue</h3>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--secondary)' }}>
-                {loading ? 'Loading…' : `${pagination.totalItems} products`}
-              </p>
+      {/* ── Top Metrics Bar (Bento Grid Style) ── */}
+      <div className="row g-4 mb-4">
+        <div className="col-12 col-sm-6 col-md-3">
+          <div className="nm-metric-card" style={{ height: '100%', background: 'linear-gradient(135deg, var(--surface-container-lowest), var(--surface-container-low))' }}>
+            <div className="d-flex justify-content-between align-items-start">
+              <span className="nm-metric-label">Total Products</span>
+              <span className="material-symbols-outlined" style={{ color: 'var(--primary-container)', fontSize: 22 }}>inventory_2</span>
             </div>
-            <button className="nm-btn nm-btn-primary" onClick={openAddProduct} disabled={loading}>
-              <span className="material-symbols-outlined">add</span>
-              Add Product
-            </button>
+            <div className="nm-metric-value">{totalProducts}</div>
+            <div className="nm-metric-sub">Catalogued items</div>
           </div>
+        </div>
+        <div className="col-12 col-sm-6 col-md-3">
+          <div className="nm-metric-card" style={{ height: '100%', background: 'linear-gradient(135deg, var(--surface-container-lowest), var(--surface-container-low))' }}>
+            <div className="d-flex justify-content-between align-items-start">
+              <span className="nm-metric-label">Low Stock Alert</span>
+              <span className="material-symbols-outlined" style={{ color: 'var(--error)', fontSize: 22 }}>warning</span>
+            </div>
+            <div className="nm-metric-value" style={{ color: lowStockCount > 0 ? 'var(--error)' : 'inherit' }}>{lowStockCount}</div>
+            <div className="nm-metric-sub">Stock levels &le; 5 items</div>
+          </div>
+        </div>
+        <div className="col-12 col-sm-6 col-md-3">
+          <div className="nm-metric-card" style={{ height: '100%', background: 'linear-gradient(135deg, var(--surface-container-lowest), var(--surface-container-low))' }}>
+            <div className="d-flex justify-content-between align-items-start">
+              <span className="nm-metric-label">Active Categories</span>
+              <span className="material-symbols-outlined" style={{ color: 'var(--secondary)', fontSize: 22 }}>folder</span>
+            </div>
+            <div className="nm-metric-value">{categoriesCount}</div>
+            <div className="nm-metric-sub">{subCats?.length || 0} Sub-categories</div>
+          </div>
+        </div>
+        <div className="col-12 col-sm-6 col-md-3">
+          <div className="nm-metric-card" style={{ height: '100%', background: 'linear-gradient(135deg, var(--surface-container-lowest), var(--surface-container-low))' }}>
+            <div className="d-flex justify-content-between align-items-start">
+              <span className="nm-metric-label">Featured items</span>
+              <span className="material-symbols-outlined" style={{ color: '#FACC15', fontSize: 22 }}>star</span>
+            </div>
+            <div className="nm-metric-value">{products?.filter(p => p.featured).length || 0}</div>
+            <div className="nm-metric-sub">Promoted on storefront</div>
+          </div>
+        </div>
+      </div>
 
-          {/* Server-side search */}
-          <div className="mb-3" style={{ position: 'relative' }}>
-            <span className="material-symbols-outlined" style={{
-              position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-              color: 'var(--secondary)', fontSize: 20, pointerEvents: 'none',
-            }}>search</span>
-            <input
-              className="nm-input"
-              style={{ paddingLeft: 40 }}
-              placeholder="Search products, brands…"
-              value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1); }}
-            />
-            {loading && (
+      {/* ── Page Navigation Tabs ── */}
+      <div className="nm-tabs mb-4">
+        <button
+          type="button"
+          className={`nm-tab-btn d-flex align-items-center gap-2 ${activeTab === 'products' ? 'active' : ''}`}
+          onClick={() => setActiveTab('products')}
+        >
+          <span className="material-symbols-outlined">inventory_2</span>
+          <span>Product Catalogue</span>
+        </button>
+        <button
+          type="button"
+          className={`nm-tab-btn d-flex align-items-center gap-2 ${activeTab === 'categories' ? 'active' : ''}`}
+          onClick={() => setActiveTab('categories')}
+        >
+          <span className="material-symbols-outlined">folder</span>
+          <span>Categories & Sub-categories</span>
+        </button>
+      </div>
+
+      {/* ── Tab Contents ── */}
+      {activeTab === 'products' ? (
+        <div className="col-12">
+          <div className="nm-card nm-card-padding">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h3 className="nm-page-section-title">Product Catalogue</h3>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--secondary)' }}>
+                  {loading ? 'Loading…' : `${pagination.totalItems} products listed`}
+                </p>
+              </div>
+              <button className="nm-btn nm-btn-primary" onClick={openAddProduct} disabled={loading}>
+                <span className="material-symbols-outlined">add</span>
+                Add Product
+              </button>
+            </div>
+
+            {/* Server-side search */}
+            <div className="mb-3" style={{ position: 'relative' }}>
               <span className="material-symbols-outlined" style={{
-                position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
-                color: 'var(--secondary)', fontSize: 18,
-              }}>hourglass_top</span>
+                position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                color: 'var(--secondary)', fontSize: 20, pointerEvents: 'none',
+              }}>search</span>
+              <input
+                className="nm-input"
+                style={{ paddingLeft: 40 }}
+                placeholder="Search products, brands, tags…"
+                value={search}
+                onChange={e => { setSearch(e.target.value); setPage(1); }}
+              />
+              {loading && (
+                <span className="material-symbols-outlined" style={{
+                  position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
+                  color: 'var(--secondary)', fontSize: 18,
+                }}>hourglass_top</span>
+              )}
+            </div>
+
+            <DataTable
+              columns={COLS}
+              data={products}
+              searchFields={[]}
+              placeholder=""
+              pageSize={pagination.limit || 10}
+            />
+
+            {/* Pagination controls */}
+            {pagination.totalPages > 1 && (
+              <div className="d-flex align-items-center justify-content-between mt-3 pt-3"
+                style={{ borderTop: '1px solid var(--outline-variant)' }}>
+                <span style={{ fontSize: 13, color: 'var(--secondary)' }}>
+                  Page {pagination.currentPage} of {pagination.totalPages}
+                </span>
+                <div className="d-flex gap-2">
+                  <button
+                    className="nm-btn nm-btn-secondary nm-btn-sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page <= 1 || loading}
+                  >
+                    <span className="material-symbols-outlined">chevron_left</span>
+                    Prev
+                  </button>
+                  <button
+                    className="nm-btn nm-btn-secondary nm-btn-sm"
+                    onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                    disabled={page >= pagination.totalPages || loading}
+                  >
+                    Next
+                    <span className="material-symbols-outlined">chevron_right</span>
+                  </button>
+                </div>
+              </div>
             )}
           </div>
-
-          <DataTable
-            columns={COLS}
-            data={products}
-            searchFields={[]}
-            placeholder=""
-            pageSize={pagination.limit || 10}
-          />
-
-          {/* Pagination controls */}
-          {pagination.totalPages > 1 && (
-            <div className="d-flex align-items-center justify-content-between mt-3 pt-3"
-              style={{ borderTop: '1px solid var(--outline-variant)' }}>
-              <span style={{ fontSize: 13, color: 'var(--secondary)' }}>
-                Page {pagination.currentPage} of {pagination.totalPages}
-              </span>
-              <div className="d-flex gap-2">
-                <button
-                  className="nm-btn nm-btn-secondary nm-btn-sm"
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page <= 1 || loading}
-                >
-                  <span className="material-symbols-outlined">chevron_left</span>
-                  Prev
-                </button>
-                <button
-                  className="nm-btn nm-btn-secondary nm-btn-sm"
-                  onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
-                  disabled={page >= pagination.totalPages || loading}
-                >
-                  Next
-                  <span className="material-symbols-outlined">chevron_right</span>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
-      </div>
-
-      {/* ── RIGHT: Category Panel ────────────────────────────── */}
-      <div className="col-12 col-xl-5">
-        <div className="nm-card nm-card-padding">
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <div>
-              <h3 className="nm-page-section-title">Category Structure</h3>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--secondary)' }}>Click a row to expand sub-categories</p>
+      ) : (
+        <div className="col-12">
+          <div className="nm-card nm-card-padding">
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <div>
+                <h3 className="nm-page-section-title">Category Structure</h3>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--secondary)' }}>Click a category row to expand and view its sub-categories.</p>
+              </div>
+              <button className="nm-btn nm-btn-primary nm-btn-sm" onClick={openAddCat}>
+                <span className="material-symbols-outlined">create_new_folder</span>
+                Add Category
+              </button>
             </div>
-            <button className="nm-btn nm-btn-primary nm-btn-sm" onClick={openAddCat}>
-              <span className="material-symbols-outlined">create_new_folder</span>
-              Add Category
-            </button>
+
+            <div className="row">
+              {cats.map(cat => (
+                <div key={cat._id || cat.id} className="col-12 col-lg-6 mb-3">
+                  <CategoryRow
+                    cat={cat}
+                    subCats={subCats}
+                    onEditCat={openEditCat}
+                    onDeleteCat={deleteCat}
+                    onEditSub={openEditSub}
+                    onDeleteSub={deleteSub}
+                    onAddSub={openAddSub}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {cats.length === 0 && (
+              <div className="nm-empty-state"><span className="material-symbols-outlined">folder_off</span><p>No categories yet.</p></div>
+            )}
+
+            {/* Category Pagination controls */}
+            {catPagination?.totalPages > 1 && (
+              <div className="d-flex align-items-center justify-content-between mt-3 pt-3"
+                style={{ borderTop: '1px solid var(--outline-variant)' }}>
+                <span style={{ fontSize: 13, color: 'var(--secondary)' }}>
+                  Page {catPagination.currentPage} of {catPagination.totalPages}
+                </span>
+                <div className="d-flex gap-2">
+                  <button
+                    className="nm-btn nm-btn-secondary nm-btn-sm"
+                    onClick={() => setCatPage(p => Math.max(1, p - 1))}
+                    disabled={catPage <= 1 || catLoading}
+                  >
+                    <span className="material-symbols-outlined">chevron_left</span>
+                    Prev
+                  </button>
+                  <button
+                    className="nm-btn nm-btn-secondary nm-btn-sm"
+                    onClick={() => setCatPage(p => Math.min(catPagination.totalPages, p + 1))}
+                    disabled={catPage >= catPagination.totalPages || catLoading}
+                  >
+                    Next
+                    <span className="material-symbols-outlined">chevron_right</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-
-          {cats.map(cat => (
-            <CategoryRow
-              key={cat._id || cat.id}
-              cat={cat}
-              subCats={subCats}
-              onEditCat={openEditCat}
-              onDeleteCat={deleteCat}
-              onEditSub={openEditSub}
-              onDeleteSub={deleteSub}
-              onAddSub={openAddSub}
-            />
-          ))}
-
-          {cats.length === 0 && (
-            <div className="nm-empty-state"><span className="material-symbols-outlined">folder_off</span><p>No categories yet.</p></div>
-          )}
-
-          {/* Category Pagination controls */}
-          {catPagination?.totalPages > 1 && (
-            <div className="d-flex align-items-center justify-content-between mt-3 pt-3"
-              style={{ borderTop: '1px solid var(--outline-variant)' }}>
-              <span style={{ fontSize: 13, color: 'var(--secondary)' }}>
-                Page {catPagination.currentPage} of {catPagination.totalPages}
-              </span>
-              <div className="d-flex gap-2">
-                <button
-                  className="nm-btn nm-btn-secondary nm-btn-sm"
-                  onClick={() => setCatPage(p => Math.max(1, p - 1))}
-                  disabled={catPage <= 1 || catLoading}
-                >
-                  <span className="material-symbols-outlined">chevron_left</span>
-                  Prev
-                </button>
-                <button
-                  className="nm-btn nm-btn-secondary nm-btn-sm"
-                  onClick={() => setCatPage(p => Math.min(catPagination.totalPages, p + 1))}
-                  disabled={catPage >= catPagination.totalPages || catLoading}
-                >
-                  Next
-                  <span className="material-symbols-outlined">chevron_right</span>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
-      </div>
+      )}
 
       {/* ── Add/Edit Product Modal ── */}
       <Modal

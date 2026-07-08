@@ -18,3 +18,20 @@ export const getUserDetailApis = async() =>{
         isPrivate: true,
     })
 }
+
+export const updateAdminProfileApis = async (profileData) => {
+  return await apiProcessor({
+    url: `${import.meta.env.VITE_ROOT_URL}/api/v1/users/profile`,
+    method: "PATCH",
+    isPrivate: true,
+    data: profileData,
+  });
+};
+
+export const fetchSecurityLogsApi = async () => {
+  return await apiProcessor({
+    url: `${import.meta.env.VITE_ROOT_URL}/api/v1/users/security-logs`,
+    method: "GET",
+    isPrivate: true,
+  });
+};

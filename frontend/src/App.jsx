@@ -8,6 +8,8 @@ import Orders from './pages/Orders';
 import Reviews from './pages/Reviews';
 import Deals from './pages/Deals';
 import Refunds from './pages/Refunds';
+import UserManagement from './pages/UserManagement';
+import Settings from './pages/Settings';
 import LoadingSpinner from './components/ui/LoadingSpinner';
 import { useDispatch, useSelector } from 'react-redux';
 import { autoLogin } from './features/admin/adminAction';
@@ -58,6 +60,8 @@ function App() {
             <Route path="/reviews" element={<Reviews />} />
             <Route path="/deals" element={<Deals />} />
             <Route path="/refunds" element={<Refunds />} />
+            <Route path="/users" element={<UserManagement />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>
         

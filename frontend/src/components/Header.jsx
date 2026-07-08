@@ -5,10 +5,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 const ROUTE_META = {
   '/dashboard': { title: 'Dashboard Overview',        placeholder: 'Search orders, customers, or reports...' },
   '/products':  { title: 'Product Management',        placeholder: 'Search products, SKUs, or categories...' },
+  '/users':     { title: 'User Management',           placeholder: 'Search users, emails, or phone numbers...' },
   '/orders':    { title: 'Orders & Payments',         placeholder: 'Search order IDs, customers or emails...' },
   '/reviews':   { title: 'Review Moderation',         placeholder: 'Search reviews, users, or products...' },
   '/deals':     { title: 'Deals Management',          placeholder: 'Search coupons or campaign names...' },
   '/refunds':   { title: 'Refund Approvals',          placeholder: 'Search refund IDs, orders, or reasons...' },
+  '/settings':  { title: 'System Settings',           placeholder: 'Search settings or security details...' },
 };
 
 const Header = () => {
@@ -92,7 +94,7 @@ const Header = () => {
         </div>
 
         {/* Settings */}
-        <button className="nm-icon-btn" aria-label="Settings">
+        <button className="nm-icon-btn" aria-label="Settings" onClick={() => navigate('/settings')}>
           <span className="material-symbols-outlined">settings</span>
         </button>
 
@@ -100,7 +102,7 @@ const Header = () => {
         <div className="nm-divider-v" />
 
         {/* Admin Profile */}
-         <div className="nm-topbar-profile">
+         <div className="nm-topbar-profile" onClick={() => navigate('/settings')}>
           <div style={{ textAlign: 'right' }}>
             <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--on-surface)', lineHeight: 1 }}>{admin?.name}</p>
             <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--secondary)' }}>{admin?.email}</p>

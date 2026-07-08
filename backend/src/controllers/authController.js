@@ -1,6 +1,10 @@
 import { compareData, hashPassword } from "../helpers/encryptHelper.js";
 import { signToken, signRefreshToken, verifyRefreshToken } from "../helpers/tokenHelper.js";
 import { Admin } from "../models/adminUserModel.js";
+import { SecurityLog } from "../models/securityLogModel.js";
+import { sendWhatsAppMessage } from "../helpers/whatsappClient.js";
+import { logSecurityEvent } from "../helpers/securityLogger.js";
+
 
 // login User
 export const loginUser = async (req, res) => {
@@ -27,7 +31,10 @@ export const loginUser = async (req, res) => {
         const accessToken = signToken(payload);
         const refreshToken = signRefreshToken(payload);
 
-        const { password, ...safeUser } = userData.toObject();
+        const { password: pass, ...safeUser } = userData.toObject();
+
+        await logSecurityEvent(userData._id, userData.name, "Login Success", "Successfully authenticated with email and password", req);
+
         return res.status(200).send({
           status: "success",
           message: "User logged in successfully",
@@ -36,12 +43,15 @@ export const loginUser = async (req, res) => {
           refreshToken,
         });
       } else {
+        // Log failed password attempt
+        await logSecurityEvent(userData._id, userData.name, "Login Failed", "Failed authentication: Invalid password entered", req);
         return res.status(400).send({
           status: "error",
           message: "Invalid email or password",
         });
       }
     } else {
+
       return res.status(400).send({
         status: "error",
         message: "Invalid email or password",
@@ -96,4 +106,79 @@ export const getUserDetail = async (req, res) => {
     user: req.user,
   });
 };
+
+export const updateAdminProfile = async (req, res) => {
+  try {
+    const adminId = req.user._id;
+    const { name, email, image, password } = req.body;
+
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (image !== undefined) updateData.image = image;
+    if (password) {
+      updateData.password = hashPassword(password);
+    }
+
+    if (email && email !== req.user.email) {
+      const existing = await Admin.findOne({ email });
+      if (existing) {
+        return res.status(400).send({
+          status: "error",
+          message: "Email is already in use by another account",
+        });
+      }
+    }
+
+    const updatedAdmin = await Admin.findByIdAndUpdate(adminId, updateData, { new: true }).select("-password -__v");
+    if (!updatedAdmin) {
+      return res.status(404).send({
+        status: "error",
+        message: "Admin not found",
+      });
+    }
+
+    // Log the profile update event
+    let updateFields = [];
+    if (name) updateFields.push("name");
+    if (email) updateFields.push("email");
+    if (image) updateFields.push("avatar");
+    if (password) updateFields.push("password");
+    await logSecurityEvent(updatedAdmin._id, updatedAdmin.name, "Profile Updated", `Updated fields: ${updateFields.join(", ")}`, req);
+
+    return res.status(200).send({
+      status: "success",
+      message: "Profile updated successfully",
+      user: updatedAdmin,
+    });
+  } catch (error) {
+    console.log("updateAdminProfile error:", error);
+    return res.status(500).send({
+      status: "error",
+      message: "Error updating profile details",
+    });
+  }
+};
+
+// Retrieve Audit Logs
+export const getSecurityLogs = async (req, res) => {
+  try {
+    const logs = await SecurityLog.find({ adminId: req.user._id })
+      .sort({ timestamp: -1 })
+      .limit(100);
+
+    return res.status(200).send({
+      status: "success",
+      logs,
+    });
+  } catch (error) {
+    console.log("getSecurityLogs error:", error);
+    return res.status(500).send({
+      status: "error",
+      message: "Error fetching security audit logs",
+    });
+  }
+};
+
+
 

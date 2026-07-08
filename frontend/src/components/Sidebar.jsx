@@ -5,10 +5,12 @@ import { NavLink, useNavigate } from 'react-router-dom';
 const NAV_ITEMS = [
   { to: '/dashboard',  label: 'Dashboard',           icon: 'dashboard' },
   { to: '/products',   label: 'Product Management',  icon: 'inventory_2' },
+  { to: '/users',      label: 'User Management',     icon: 'group' },
   { to: '/orders',     label: 'Orders & Payments',   icon: 'payments' },
   { to: '/reviews',    label: 'Review Moderation',   icon: 'rate_review' },
   { to: '/deals',      label: 'Deals Management',    icon: 'sell' },
   { to: '/refunds',    label: 'Refund Approvals',    icon: 'assignment_return' },
+  { to: '/settings',   label: 'System Settings',     icon: 'settings' },
 ];
 
 const Sidebar = () => {
