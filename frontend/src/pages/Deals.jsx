@@ -1,79 +1,29 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  fetchAllDeals, loadPickerData,
+  createDeal, updateDeal, toggleDealStatus, deleteDeal,
+} from '../features/deals/dealsAction';
 import DataTable from '../components/ui/DataTable';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
 import MetricCard from '../components/ui/MetricCard';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
-/* ─── Backend dealsModel aligned data ──────────────────────────
-   title (NOT name), description, bannerImage
-   products[]  ← array of Product refs (no category-level support in model)
-   discountType: "percentage" | "fixed"  ← lowercase
-   discountValue, startsAt (Date), endsAt (Date), isActive
-──────────────────────────────────────────────────────────────── */
-const ALL_PRODUCTS = [
-  { id: 'p1', name: 'Vapor Ultra Running Shoes', category: 'Footwear',    basePrice: 149.99, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=60&h=60&fit=crop' },
-  { id: 'p2', name: 'Chronos Smartwatch Gen 5',  category: 'Electronics', basePrice: 299.00, image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=60&h=60&fit=crop' },
-  { id: 'p3', name: 'AeroDry Hoodie Pro',         category: 'Apparel',     basePrice: 79.99,  image: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=60&h=60&fit=crop' },
-  { id: 'p4', name: 'Apex Bluetooth Earbuds',     category: 'Electronics', basePrice: 119.50, image: 'https://images.unsplash.com/photo-1606220838315-056192d5e927?w=60&h=60&fit=crop' },
-  { id: 'p5', name: 'Element Compression Shorts', category: 'Apparel',     basePrice: 34.50,  image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=60&h=60&fit=crop' },
-  { id: 'p6', name: 'Pace Trainer Sneaker v2',    category: 'Footwear',    basePrice: 95.00,  image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=60&h=60&fit=crop' },
-];
-
-const INIT_DEALS = [
-  {
-    id: 'd1',
-    title: 'Runner\'s Bundle Deal',
-    description: 'Special pricing on our top-rated running footwear for the season.',
-    bannerImage: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&h=200&fit=crop',
-    products: ['p1', 'p6'],
-    discountType: 'percentage',
-    discountValue: 20,
-    startsAt: '2026-06-15',
-    endsAt:   '2026-06-30',
-    isActive: true,
-  },
-  {
-    id: 'd2',
-    title: 'Tech Upgrade Festival',
-    description: 'Massive savings on all Electronics — smartwatches, earbuds and more.',
-    bannerImage: 'https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=600&h=200&fit=crop',
-    products: ['p2', 'p4'],
-    discountType: 'percentage',
-    discountValue: 25,
-    startsAt: '2026-07-01',
-    endsAt:   '2026-07-31',
-    isActive: false,
-  },
-  {
-    id: 'd3',
-    title: 'Smartwatch Flash Price',
-    description: 'One-day flash deal — $50 flat off the Chronos Smartwatch Gen 5.',
-    bannerImage: '',
-    products: ['p2'],
-    discountType: 'fixed',
-    discountValue: 50,
-    startsAt: '2026-06-21',
-    endsAt:   '2026-06-21',
-    isActive: true,
-  },
-  {
-    id: 'd4',
-    title: 'Summer Apparel Sale',
-    description: 'Stay cool with 15% off all Apparel products this summer.',
-    bannerImage: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=600&h=200&fit=crop',
-    products: ['p3', 'p5'],
-    discountType: 'percentage',
-    discountValue: 15,
-    startsAt: '2026-06-01',
-    endsAt:   '2026-08-31',
-    isActive: true,
-  },
-];
+/* ─────────────────────────────────────────────────────────────────
+  Deals Page — wired to Redux
+  Admin can create a deal targeting:
+    • Individual products
+    • Whole categories (all products in that category get the discount)
+    • Or both at the same time
+──────────────────────────────────────────────────────────────────── */
 
 const BLANK = {
-  title: '', description: '',
+  title: '',
+  description: '',
   bannerImage: '',
   products: [],
+  categories: [],
   discountType: 'percentage',
   discountValue: '',
   startsAt: '',
@@ -81,33 +31,97 @@ const BLANK = {
   isActive: true,
 };
 
-/* ── Product multi-checkbox selector ──────────────────────────── */
-const ProductSelector = ({ selected, onChange }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflowY: 'auto', padding: '2px 0' }}>
-    {ALL_PRODUCTS.map(p => {
-      const checked = selected.includes(p.id);
-      return (
-        <label key={p.id} style={{
-          display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
-          borderRadius: 8, cursor: 'pointer',
-          border: `1px solid ${checked ? 'var(--primary-container)' : 'var(--outline-variant)'}`,
-          background: checked ? 'rgba(19,27,46,0.04)' : 'var(--surface-container-lowest)',
-          transition: 'all 0.15s',
-        }}>
-          <input type="checkbox" checked={checked} style={{ width: 16, height: 16, flexShrink: 0 }}
-            onChange={() => onChange(checked ? selected.filter(id => id !== p.id) : [...selected, p.id])} />
-          <img src={p.image} alt={p.name} style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--outline-variant)' }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-            <div style={{ fontSize: 12, color: 'var(--secondary)' }}>{p.category} · ${p.basePrice.toFixed(2)}</div>
-          </div>
-        </label>
-      );
-    })}
-  </div>
-);
+// Converts a backend Deal object to form state
+const dealToForm = (d) => ({
+  title:         d.title         || '',
+  description:   d.description   || '',
+  bannerImage:   d.bannerImage   || '',
+  products:      (d.products   || []).map((p) => (typeof p === 'object' ? p._id : p)),
+  categories:    (d.categories || []).map((c) => (typeof c === 'object' ? c._id : c)),
+  discountType:  d.discountType  || 'percentage',
+  discountValue: d.discountValue ?? '',
+  startsAt:      d.startsAt ? d.startsAt.slice(0, 10) : '',
+  endsAt:        d.endsAt   ? d.endsAt.slice(0,   10) : '',
+  isActive:      d.isActive ?? true,
+});
 
-/* ── Banner image picker ────────────────────────────────────── */
+/* ── Multi-item checkbox picker ─────────────────────────────────── */
+const ItemPicker = ({ items, selected, onChange, nameKey = 'name', imageKey = 'images', subKey = null }) => {
+  const [search, setSearch] = useState('');
+  const filtered = items.filter((item) =>
+    (item[nameKey] || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggle = (id) => {
+    if (selected.includes(id)) onChange(selected.filter((s) => s !== id));
+    else onChange([...selected, id]);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="nm-input-group" style={{ marginBottom: 4 }}>
+        <span className="material-symbols-outlined">search</span>
+        <input
+          className="nm-input"
+          placeholder="Search…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {filtered.length === 0 && (
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--secondary)' }}>No items found.</p>
+        )}
+        {filtered.map((item) => {
+          const id      = item._id;
+          const checked = selected.includes(id);
+          const thumb   = Array.isArray(item[imageKey]) ? item[imageKey][0] : item[imageKey];
+          const sub     = subKey ? item[subKey] : null;
+          return (
+            <label key={id} style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+              borderRadius: 8, cursor: 'pointer',
+              border: `1px solid ${checked ? 'var(--primary-container)' : 'var(--outline-variant)'}`,
+              background: checked ? 'rgba(19,27,200,0.04)' : 'var(--surface-container-lowest)',
+              transition: 'all 0.15s',
+            }}>
+              <input
+                type="checkbox"
+                checked={checked}
+                style={{ width: 16, height: 16, flexShrink: 0 }}
+                onChange={() => toggle(id)}
+              />
+              {thumb ? (
+                <img
+                  src={thumb}
+                  alt={item[nameKey]}
+                  style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--outline-variant)' }}
+                />
+              ) : (
+                <div style={{ width: 38, height: 38, borderRadius: 6, flexShrink: 0, background: 'var(--surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--secondary)' }}>inventory_2</span>
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item[nameKey]}
+                </div>
+                {sub && (
+                  <div style={{ fontSize: 12, color: 'var(--secondary)' }}>{sub}</div>
+                )}
+              </div>
+              {checked && (
+                <span className="material-symbols-outlined" style={{ color: 'var(--primary-container)', fontSize: 18 }}>check_circle</span>
+              )}
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/* ── Banner image picker ────────────────────────────────────────── */
 const BannerPicker = ({ value, onChange }) => {
   const ref = useRef();
   const handleFile = (e) => {
@@ -117,7 +131,9 @@ const BannerPicker = ({ value, onChange }) => {
   };
   return (
     <div>
-      <label className="nm-label">Banner Image <span style={{ opacity: 0.5, fontWeight: 400 }}>(optional)</span></label>
+      <label className="nm-label">
+        Banner Image <span style={{ opacity: 0.5, fontWeight: 400 }}>(optional)</span>
+      </label>
       <div
         onClick={() => ref.current.click()}
         style={{
@@ -125,15 +141,17 @@ const BannerPicker = ({ value, onChange }) => {
           border: '2px dashed var(--outline-variant)',
           background: 'var(--surface-container-low)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          overflow: 'hidden', position: 'relative',
+          overflow: 'hidden',
         }}
       >
         {value
           ? <img src={value} alt="banner" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: 'var(--secondary)' }}>
+          : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: 'var(--secondary)' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 32 }}>add_photo_alternate</span>
               <span style={{ fontSize: 12 }}>Click to upload banner (600×200 recommended)</span>
             </div>
+          )
         }
       </div>
       <div className="d-flex gap-2 mt-2">
@@ -151,52 +169,85 @@ const BannerPicker = ({ value, onChange }) => {
   );
 };
 
-/* ── Main Deals page ──────────────────────────────────────────── */
+/* ── Main Deals page ─────────────────────────────────────────────── */
 const Deals = () => {
-  const [deals, setDeals] = useState(INIT_DEALS);
-  const [modal, setModal] = useState(null);
-  const [editRow, setEditRow]   = useState(null);
+  const dispatch = useDispatch();
+  const { deals, loading, stats, allProducts, allCategories } = useSelector((s) => s.dealsStore);
+
+  const [modal,   setModal]   = useState(null); // 'add' | 'edit' | 'detail'
+  const [editRow, setEditRow] = useState(null);
   const [selected, setSelected] = useState(null);
-  const [form, setForm]         = useState(BLANK);
+  const [form, setForm] = useState(BLANK);
 
-  const openAdd    = () => { setForm({ ...BLANK }); setModal('add'); };
-  const openEdit   = (d) => { setEditRow(d); setForm({ ...d }); setModal('edit'); };
+  // 'products' or 'categories' — which picker mode is active in the form
+  const [pickerMode, setPickerMode] = useState('products');
+
+  const [saving,   setSaving]   = useState(false);
+  const [deleting, setDeleting] = useState(null);
+
+  // Load deals and picker data on mount
+  useEffect(() => {
+    dispatch(fetchAllDeals());
+    dispatch(loadPickerData());
+  }, [dispatch]);
+
+  const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+  const openAdd = () => {
+    setForm({ ...BLANK });
+    setPickerMode('products');
+    setModal('add');
+  };
+
+  const openEdit = (d) => {
+    setEditRow(d);
+    setForm(dealToForm(d));
+    setPickerMode('products');
+    setModal('edit');
+  };
+
   const openDetail = (d) => { setSelected(d); setModal('detail'); };
-  const close      = () => { setModal(null); setEditRow(null); setSelected(null); };
+  const close = () => { setModal(null); setEditRow(null); setSelected(null); };
 
-  const set = (field, value) => setForm(f => ({ ...f, [field]: value }));
-
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    const data = { ...form, discountValue: +form.discountValue };
-    if (modal === 'add') {
-      setDeals(prev => [{ ...data, id: `d${Date.now()}` }, ...prev]);
-    } else {
-      setDeals(prev => prev.map(d => d.id === editRow.id ? { ...d, ...data } : d));
+    if (form.products.length === 0 && form.categories.length === 0) {
+      alert('Please select at least one product or one category.');
+      return;
     }
-    close();
+    const payload = {
+      ...form,
+      discountValue: Number(form.discountValue),
+    };
+    setSaving(true);
+    let ok;
+    if (modal === 'add') {
+      ok = await dispatch(createDeal(payload));
+    } else {
+      ok = await dispatch(updateDeal(editRow._id, payload));
+    }
+    setSaving(false);
+    if (ok) close();
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Delete this deal?')) setDeals(prev => prev.filter(d => d.id !== id));
+  const handleToggle = async (deal) => {
+    await dispatch(toggleDealStatus(deal._id, !deal.isActive));
   };
 
-  const toggleActive = (id) =>
-    setDeals(prev => prev.map(d => d.id === id ? { ...d, isActive: !d.isActive } : d));
+  const handleDelete = async (dealId) => {
+    if (!window.confirm('Delete this deal?')) return;
+    setDeleting(dealId);
+    await dispatch(deleteDeal(dealId));
+    setDeleting(null);
+  };
 
-  /* Stats */
-  const activeCount  = deals.filter(d => d.isActive).length;
-  const totalProds   = [...new Set(deals.flatMap(d => d.products))].length;
-
+  /* ── Table columns ─── */
   const COLS = [
     {
       key: 'title', label: 'Deal',
-      render: r => (
+      render: (r) => (
         <div className="d-flex align-items-center gap-3">
-          <div style={{
-            width: 56, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0,
-            border: '1px solid var(--outline-variant)', background: 'var(--surface-container-low)'
-          }}>
+          <div style={{ width: 56, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, border: '1px solid var(--outline-variant)', background: 'var(--surface-container-low)' }}>
             {r.bannerImage
               ? <img src={r.bannerImage} alt={r.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -206,108 +257,179 @@ const Deals = () => {
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 14 }}>{r.title}</div>
-            <div style={{ fontSize: 12, color: 'var(--secondary)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>
+            <div style={{ fontSize: 12, color: 'var(--secondary)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {r.description}
+            </div>
           </div>
         </div>
-      )
+      ),
     },
     {
-      key: 'products', label: 'Products', sortable: false,
-      render: r => {
-        const prods = ALL_PRODUCTS.filter(p => r.products.includes(p.id));
+      key: 'scope', label: 'Applies To', sortable: false,
+      render: (r) => {
+        const prods = r.products   || [];
+        const cats  = r.categories || [];
         return (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {prods.slice(0, 3).map(p => (
-              <img key={p.id} src={p.image} alt={p.name} title={p.name}
-                style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--outline-variant)' }} />
-            ))}
-            {prods.length > 3 && (
-              <span style={{ width: 28, height: 28, borderRadius: 4, background: 'var(--surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'var(--secondary)' }}>
-                +{prods.length - 3}
-              </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {cats.length > 0 && (
+              <div className="d-flex align-items-center gap-1 flex-wrap">
+                <span className="material-symbols-outlined" style={{ fontSize: 13, color: 'var(--secondary)' }}>category</span>
+                {cats.map((c) => (
+                  <span key={c._id || c} className="nm-badge" style={{ fontSize: 10 }}>
+                    {c.name || 'Category'}
+                  </span>
+                ))}
+              </div>
+            )}
+            {prods.length > 0 && (
+              <div className="d-flex align-items-center gap-1 flex-wrap">
+                <span className="material-symbols-outlined" style={{ fontSize: 13, color: 'var(--secondary)' }}>inventory_2</span>
+                <span style={{ fontSize: 12, color: 'var(--secondary)' }}>{prods.length} product{prods.length !== 1 ? 's' : ''}</span>
+              </div>
             )}
           </div>
         );
-      }
+      },
     },
     {
       key: 'discountValue', label: 'Discount',
-      render: r => (
+      render: (r) => (
         <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 16, color: 'var(--primary-container)' }}>
           {r.discountType === 'percentage' ? `${r.discountValue}%` : `$${r.discountValue}`}
           <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--secondary)', marginLeft: 4 }}>
             {r.discountType === 'percentage' ? 'OFF' : 'FLAT'}
           </span>
         </span>
-      )
+      ),
     },
     {
       key: 'startsAt', label: 'Duration', sortable: false,
-      render: r => (
+      render: (r) => (
         <div style={{ fontSize: 12 }}>
-          <div><strong>{r.startsAt}</strong></div>
+          <div><strong>{r.startsAt ? new Date(r.startsAt).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</strong></div>
           <div style={{ color: 'var(--outline)', margin: '2px 0' }}>→</div>
-          <div><strong>{r.endsAt}</strong></div>
+          <div><strong>{r.endsAt ? new Date(r.endsAt).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</strong></div>
         </div>
-      )
+      ),
     },
     {
       key: 'isActive', label: 'Status',
-      render: r => <StatusBadge status={r.isActive ? 'Active' : 'Inactive'} />
+      render: (r) => <StatusBadge status={r.isActive ? 'Active' : 'Inactive'} />,
     },
     {
       key: 'actions', label: 'Actions', sortable: false,
-      render: r => (
+      render: (r) => (
         <div className="d-flex gap-1">
-          <button className="nm-action-btn" title="Preview deal" onClick={() => openDetail(r)}>
+          <button className="nm-action-btn" title="Preview" onClick={() => openDetail(r)}>
             <span className="material-symbols-outlined">visibility</span>
           </button>
           <button className="nm-action-btn" title="Edit" onClick={() => openEdit(r)}>
             <span className="material-symbols-outlined">edit</span>
           </button>
-          <button className="nm-action-btn" title={r.isActive ? 'Deactivate' : 'Activate'} onClick={() => toggleActive(r.id)}>
+          <button className="nm-action-btn" title={r.isActive ? 'Deactivate' : 'Activate'} onClick={() => handleToggle(r)}>
             <span className="material-symbols-outlined">{r.isActive ? 'pause_circle' : 'play_circle'}</span>
           </button>
-          <button className="nm-action-btn danger" title="Delete" onClick={() => handleDelete(r.id)}>
+          <button
+            className="nm-action-btn danger"
+            title="Delete"
+            disabled={deleting === r._id}
+            onClick={() => handleDelete(r._id)}
+          >
             <span className="material-symbols-outlined">delete</span>
           </button>
         </div>
-      )
-    }
+      ),
+    },
   ];
 
+  /* ── Deal form (used in Add + Edit modal) ─── */
   const DealForm = () => (
     <form id="deal-form" onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div className="row g-3">
         <div className="col-12">
           <label className="nm-label">Deal Title *</label>
           <input className="nm-input" placeholder="e.g. Runner's Bundle Deal" value={form.title}
-            onChange={e => set('title', e.target.value)} required />
+            onChange={(e) => set('title', e.target.value)} required />
         </div>
         <div className="col-12">
           <label className="nm-label">Description</label>
-          <textarea className="nm-input" rows={2} placeholder="Brief description of the deal…" value={form.description}
-            onChange={e => set('description', e.target.value)} style={{ resize: 'vertical' }} />
+          <textarea className="nm-input" rows={2} placeholder="Brief description…" value={form.description}
+            onChange={(e) => set('description', e.target.value)} style={{ resize: 'vertical' }} />
         </div>
       </div>
 
-      <BannerPicker value={form.bannerImage} onChange={v => set('bannerImage', v)} />
+      <BannerPicker value={form.bannerImage} onChange={(v) => set('bannerImage', v)} />
 
+      {/* ── Picker mode toggle ── */}
       <div>
-        <label className="nm-label">Products in this Deal *</label>
-        <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--secondary)' }}>
-          Select which products are included. The discount applies to the <strong>basePrice</strong> of each.
-        </p>
-        <ProductSelector selected={form.products} onChange={v => set('products', v)} />
-        {form.products.length === 0 && (
-          <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--error)' }}>Select at least one product.</p>
+        <label className="nm-label" style={{ marginBottom: 8 }}>Apply Deal To *</label>
+        <div className="nm-tabs mb-3">
+          <button
+            type="button"
+            className={`nm-tab-btn${pickerMode === 'products' ? ' active' : ''}`}
+            onClick={() => setPickerMode('products')}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 15, verticalAlign: 'middle', marginRight: 4 }}>inventory_2</span>
+            Products
+            {form.products.length > 0 && (
+              <span className="ms-2 nm-badge nm-badge-info">{form.products.length}</span>
+            )}
+          </button>
+          <button
+            type="button"
+            className={`nm-tab-btn${pickerMode === 'categories' ? ' active' : ''}`}
+            onClick={() => setPickerMode('categories')}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 15, verticalAlign: 'middle', marginRight: 4 }}>category</span>
+            Categories
+            {form.categories.length > 0 && (
+              <span className="ms-2 nm-badge nm-badge-info">{form.categories.length}</span>
+            )}
+          </button>
+        </div>
+
+        {pickerMode === 'products' ? (
+          <>
+            <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--secondary)' }}>
+              Select individual products. The discount applies to their base price.
+            </p>
+            <ItemPicker
+              items={allProducts}
+              selected={form.products}
+              onChange={(v) => set('products', v)}
+              nameKey="name"
+              imageKey="images"
+              subKey={null}
+            />
+          </>
+        ) : (
+          <>
+            <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--secondary)' }}>
+              Select whole categories. <strong>Every product in the selected categories</strong> will get the discount.
+            </p>
+            <ItemPicker
+              items={allCategories}
+              selected={form.categories}
+              onChange={(v) => set('categories', v)}
+              nameKey="name"
+              imageKey="image"
+              subKey="slug"
+            />
+          </>
+        )}
+
+        {form.products.length === 0 && form.categories.length === 0 && (
+          <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--error)' }}>
+            Select at least one product or one category.
+          </p>
         )}
       </div>
 
+      {/* Discount + dates */}
       <div className="row g-3">
         <div className="col-md-6">
           <label className="nm-label">Discount Type *</label>
-          <select className="nm-select" value={form.discountType} onChange={e => set('discountType', e.target.value)}>
+          <select className="nm-select" value={form.discountType} onChange={(e) => set('discountType', e.target.value)}>
             <option value="percentage">Percentage (%)</option>
             <option value="fixed">Fixed Amount ($)</option>
           </select>
@@ -321,20 +443,20 @@ const Deals = () => {
             <input type="number" min="0" max={form.discountType === 'percentage' ? 100 : undefined}
               step={form.discountType === 'percentage' ? '1' : '0.01'}
               className="nm-input" placeholder="0" style={{ paddingLeft: 28 }}
-              value={form.discountValue} onChange={e => set('discountValue', e.target.value)} required />
+              value={form.discountValue} onChange={(e) => set('discountValue', e.target.value)} required />
           </div>
         </div>
         <div className="col-md-6">
           <label className="nm-label">Starts At *</label>
-          <input type="date" className="nm-input" value={form.startsAt} onChange={e => set('startsAt', e.target.value)} required />
+          <input type="date" className="nm-input" value={form.startsAt} onChange={(e) => set('startsAt', e.target.value)} required />
         </div>
         <div className="col-md-6">
           <label className="nm-label">Ends At *</label>
-          <input type="date" className="nm-input" value={form.endsAt} onChange={e => set('endsAt', e.target.value)} required />
+          <input type="date" className="nm-input" value={form.endsAt} onChange={(e) => set('endsAt', e.target.value)} required />
         </div>
         <div className="col-12">
           <label className="d-flex align-items-center gap-2" style={{ cursor: 'pointer', fontSize: 14 }}>
-            <input type="checkbox" checked={form.isActive} onChange={e => set('isActive', e.target.checked)} />
+            <input type="checkbox" checked={form.isActive} onChange={(e) => set('isActive', e.target.checked)} />
             <span style={{ fontWeight: 600 }}>Active <span style={{ color: 'var(--secondary)', fontWeight: 400 }}>(deal is live immediately)</span></span>
           </label>
         </div>
@@ -344,19 +466,20 @@ const Deals = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
       {/* Stats */}
       <div className="row g-4">
         <div className="col-6 col-xl-3">
-          <MetricCard label="Total Deals" value={deals.length} sub="All time" />
+          <MetricCard label="Total Deals"       value={stats.totalDeals}     sub="All time" />
         </div>
         <div className="col-6 col-xl-3">
-          <MetricCard label="Active Deals" value={activeCount} sub="Currently live" />
+          <MetricCard label="Active Deals"      value={stats.activeDeals}    sub="Currently live" />
         </div>
         <div className="col-6 col-xl-3">
-          <MetricCard label="Products on Deal" value={totalProds} sub="Unique SKUs covered" />
+          <MetricCard label="Products on Deal"  value={stats.productsOnDeal} sub="Unique SKUs covered" />
         </div>
         <div className="col-6 col-xl-3">
-          <MetricCard label="Inactive Deals" value={deals.length - activeCount} sub="Paused / Expired" alert={deals.length - activeCount > 0} />
+          <MetricCard label="Inactive Deals"    value={stats.inactiveDeals}  sub="Paused / Expired" alert={stats.inactiveDeals > 0} />
         </div>
       </div>
 
@@ -364,9 +487,9 @@ const Deals = () => {
       <div className="nm-card nm-card-padding">
         <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
-            <h3 className="nm-page-section-title">Deals & Promotions</h3>
+            <h3 className="nm-page-section-title">Deals &amp; Promotions</h3>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--secondary)' }}>
-              Select products for each deal — discounts apply to their base price.
+              Apply discounts to individual products or entire categories.
             </p>
           </div>
           <button className="nm-btn nm-btn-primary" onClick={openAdd}>
@@ -374,13 +497,17 @@ const Deals = () => {
           </button>
         </div>
 
-        <DataTable
-          columns={COLS}
-          data={deals}
-          searchFields={['title', 'description']}
-          placeholder="Search deals…"
-          pageSize={5}
-        />
+        {loading ? (
+          <LoadingSpinner />
+        ) : (
+          <DataTable
+            columns={COLS}
+            data={deals}
+            searchFields={['title', 'description']}
+            placeholder="Search deals…"
+            pageSize={8}
+          />
+        )}
       </div>
 
       {/* Add / Edit Modal */}
@@ -391,9 +518,10 @@ const Deals = () => {
         size="lg"
         footer={
           <>
-            <button className="nm-btn nm-btn-secondary" onClick={close}>Cancel</button>
-            <button className="nm-btn nm-btn-primary" form="deal-form" type="submit">
-              {modal === 'add' ? 'Launch Deal' : 'Save Changes'}
+            <button className="nm-btn nm-btn-secondary" onClick={close} disabled={saving}>Cancel</button>
+            <button className="nm-btn nm-btn-primary" form="deal-form" type="submit" disabled={saving}>
+              <span className="material-symbols-outlined">{saving ? 'hourglass_top' : 'check'}</span>
+              {saving ? 'Saving…' : (modal === 'add' ? 'Launch Deal' : 'Save Changes')}
             </button>
           </>
         }
@@ -401,7 +529,7 @@ const Deals = () => {
         <DealForm />
       </Modal>
 
-      {/* Deal Detail Preview */}
+      {/* Detail Preview Modal */}
       <Modal
         isOpen={modal === 'detail' && !!selected}
         onClose={close}
@@ -421,6 +549,8 @@ const Deals = () => {
             {selected.bannerImage && (
               <img src={selected.bannerImage} alt="banner" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--outline-variant)' }} />
             )}
+
+            {/* Discount hero */}
             <div style={{ textAlign: 'center', padding: '20px 16px', background: 'var(--surface-container-low)', borderRadius: 12 }}>
               <div style={{ fontSize: 44, fontWeight: 900, fontFamily: 'var(--font-mono)', color: 'var(--primary-container)', lineHeight: 1 }}>
                 {selected.discountType === 'percentage' ? `${selected.discountValue}%` : `$${selected.discountValue}`}
@@ -432,42 +562,73 @@ const Deals = () => {
               <p style={{ margin: 0, fontSize: 14, color: 'var(--secondary)' }}>{selected.description}</p>
             </div>
 
-            {/* Products list */}
-            <div>
-              <p className="nm-label" style={{ marginBottom: 10 }}>Products Included ({selected.products.length})</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {ALL_PRODUCTS.filter(p => selected.products.includes(p.id)).map(p => {
-                  const discounted = selected.discountType === 'percentage'
-                    ? p.basePrice * (1 - selected.discountValue / 100)
-                    : p.basePrice - selected.discountValue;
-                  return (
-                    <div key={p.id} className="d-flex align-items-center gap-3" style={{ padding: '10px 14px', background: 'var(--surface-container-lowest)', border: '1px solid var(--outline-variant)', borderRadius: 8 }}>
-                      <img src={p.image} alt={p.name} style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover' }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--secondary)' }}>{p.category}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--primary-container)' }}>
-                          ${Math.max(0, discounted).toFixed(2)}
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--secondary)', textDecoration: 'line-through' }}>
-                          ${p.basePrice.toFixed(2)}
-                        </div>
-                      </div>
+            {/* Categories included */}
+            {selected.categories?.length > 0 && (
+              <div>
+                <p className="nm-label" style={{ marginBottom: 10 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle', marginRight: 4 }}>category</span>
+                  Categories ({selected.categories.length})
+                </p>
+                <div className="d-flex flex-wrap gap-2">
+                  {selected.categories.map((cat) => (
+                    <div key={cat._id || cat} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: 'var(--surface-container-lowest)', border: '1px solid var(--outline-variant)', borderRadius: 8 }}>
+                      {cat.image && (
+                        <img src={cat.image} alt={cat.name} style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover' }} />
+                      )}
+                      <span style={{ fontWeight: 600, fontSize: 14 }}>{cat.name || '—'}</span>
+                      <span style={{ fontSize: 11, color: 'var(--secondary)' }}>All products</span>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
+            {/* Products included */}
+            {selected.products?.length > 0 && (
+              <div>
+                <p className="nm-label" style={{ marginBottom: 10 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle', marginRight: 4 }}>inventory_2</span>
+                  Products ({selected.products.length})
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {selected.products.map((p) => {
+                    const basePrice = p.basePrice || 0;
+                    const discounted = selected.discountType === 'percentage'
+                      ? basePrice * (1 - selected.discountValue / 100)
+                      : basePrice - selected.discountValue;
+                    return (
+                      <div key={p._id || p} className="d-flex align-items-center gap-3" style={{ padding: '10px 14px', background: 'var(--surface-container-lowest)', border: '1px solid var(--outline-variant)', borderRadius: 8 }}>
+                        {p.images?.[0] && (
+                          <img src={p.images[0]} alt={p.name} style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover' }} />
+                        )}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>{p.name || '—'}</div>
+                        </div>
+                        {basePrice > 0 && (
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--primary-container)' }}>
+                              ${Math.max(0, discounted).toFixed(2)}
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--secondary)', textDecoration: 'line-through' }}>
+                              ${basePrice.toFixed(2)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Meta grid */}
             <div className="row g-2">
               {[
-                { label: 'Status',    value: <StatusBadge status={selected.isActive ? 'Active' : 'Inactive'} /> },
-                { label: 'Starts At', value: selected.startsAt },
-                { label: 'Ends At',   value: selected.endsAt   },
-                { label: 'Products',  value: `${selected.products.length} product${selected.products.length !== 1 ? 's' : ''}` },
-              ].map(m => (
+                { label: 'Status',     value: <StatusBadge status={selected.isActive ? 'Active' : 'Inactive'} /> },
+                { label: 'Starts At',  value: selected.startsAt ? new Date(selected.startsAt).toLocaleDateString('en-AU') : '—' },
+                { label: 'Ends At',    value: selected.endsAt   ? new Date(selected.endsAt).toLocaleDateString('en-AU')   : '—' },
+                { label: 'Scope',      value: `${selected.products?.length || 0} products · ${selected.categories?.length || 0} categories` },
+              ].map((m) => (
                 <div key={m.label} className="col-6">
                   <div style={{ padding: '10px 14px', background: 'var(--surface-container-low)', borderRadius: 8 }}>
                     <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--secondary)' }}>{m.label}</p>

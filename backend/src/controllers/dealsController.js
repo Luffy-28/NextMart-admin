@@ -1,12 +1,11 @@
 import { Deal } from "../models/dealsModel.js";
 import Product from "../models/productModel.js";
-
+import { Category } from "../models/categoryModel.js";
 
 /* ─────────────────────────────────────────────────────────────────
   GET /api/v1/deals
   Query params: page, limit, search (title/description), isActive
-  Returns paginated deals with products populated.
-  Feeds the Deals.jsx DataTable and MetricCard stats.
+  Returns paginated deals with products and categories populated.
 ───────────────────────────────────────────────────────────────────*/
 export const getAllDeals = async (req, res) => {
  try {
@@ -15,9 +14,7 @@ export const getAllDeals = async (req, res) => {
    const limitNum = parseInt(limit, 10);
    const skip = (pageNum - 1) * limitNum;
 
-
    const filter = {};
-
 
    if (search) {
      filter.$or = [
@@ -26,36 +23,29 @@ export const getAllDeals = async (req, res) => {
      ];
    }
 
-
-   // Optional active/inactive filter
    if (isActive !== undefined && isActive !== "") {
      filter.isActive = isActive === "true" || isActive === true;
    }
 
-
    const [deals, total] = await Promise.all([
      Deal.find(filter)
        .populate("products", "name images basePrice discountedPrice category brand")
+       .populate("categories", "name image slug")
        .skip(skip)
        .limit(limitNum)
        .sort({ createdAt: -1 }),
      Deal.countDocuments(filter),
    ]);
 
-
-   // Stats used by the MetricCard row in Deals.jsx
    const [totalDeals, activeCount] = await Promise.all([
      Deal.countDocuments(),
      Deal.countDocuments({ isActive: true }),
    ]);
 
-
-   // Unique SKUs currently under any deal
    const allActiveDeals = await Deal.find({ isActive: true }).select("products");
    const uniqueProductIds = new Set(
      allActiveDeals.flatMap((d) => d.products.map((id) => String(id)))
    );
-
 
    return res.status(200).json({
      status: "success",
@@ -76,10 +66,7 @@ export const getAllDeals = async (req, res) => {
    });
  } catch (error) {
    console.error("getAllDeals error:", error);
-   return res.status(500).json({
-     status: "error",
-     message: "Error fetching deals",
-   });
+   return res.status(500).json({ status: "error", message: "Error fetching deals" });
  }
 };
 
@@ -90,10 +77,9 @@ export const getAllDeals = async (req, res) => {
 export const getDealById = async (req, res) => {
  try {
    const { dealId } = req.params;
-   const deal = await Deal.findById(dealId).populate(
-     "products",
-     "name images basePrice discountedPrice category brand stock"
-   );
+   const deal = await Deal.findById(dealId)
+     .populate("products", "name images basePrice discountedPrice category brand stock")
+     .populate("categories", "name image slug");
    if (!deal) {
      return res.status(404).json({ status: "error", message: "Deal not found" });
    }
@@ -105,7 +91,15 @@ export const getDealById = async (req, res) => {
 };
 
 
-// create deals api
+/* ─────────────────────────────────────────────────────────────────
+  POST /api/v1/deals/create
+  Body: title, description, bannerImage, products[], categories[],
+        discountType, discountValue, startsAt, endsAt, isActive
+  Admin can target:
+    - Individual products (products array)
+    - Whole categories   (categories array)
+    - Both at the same time
+───────────────────────────────────────────────────────────────────*/
 export const createDeal = async (req, res) => {
  try {
    const {
@@ -113,13 +107,13 @@ export const createDeal = async (req, res) => {
      description,
      bannerImage,
      products,
+     categories,
      discountType,
      discountValue,
      startsAt,
      endsAt,
      isActive,
    } = req.body;
-
 
    // Required fields validation
    if (!title || !discountType || discountValue === undefined || !startsAt || !endsAt) {
@@ -129,14 +123,12 @@ export const createDeal = async (req, res) => {
      });
    }
 
-
    if (!["percentage", "fixed"].includes(discountType)) {
      return res.status(400).json({
        status: "error",
        message: "discountType must be 'percentage' or 'fixed'",
      });
    }
-
 
    const value = parseFloat(discountValue);
    if (isNaN(value) || value < 0) {
@@ -146,7 +138,6 @@ export const createDeal = async (req, res) => {
      });
    }
 
-
    if (discountType === "percentage" && value > 100) {
      return res.status(400).json({
        status: "error",
@@ -154,9 +145,8 @@ export const createDeal = async (req, res) => {
      });
    }
 
-
    const startDate = new Date(startsAt);
-   const endDate = new Date(endsAt);
+   const endDate   = new Date(endsAt);
    if (isNaN(startDate) || isNaN(endDate)) {
      return res.status(400).json({ status: "error", message: "Invalid date format" });
    }
@@ -167,10 +157,19 @@ export const createDeal = async (req, res) => {
      });
    }
 
+   // Must have at least products OR categories
+   const hasProducts   = Array.isArray(products)   && products.length > 0;
+   const hasCategories = Array.isArray(categories) && categories.length > 0;
+   if (!hasProducts && !hasCategories) {
+     return res.status(400).json({
+       status: "error",
+       message: "A deal must have at least one product or one category",
+     });
+   }
 
-   // Validate product ids if provided
+   // Validate product IDs
    let productIds = [];
-   if (Array.isArray(products) && products.length > 0) {
+   if (hasProducts) {
      const found = await Product.find({ _id: { $in: products } }).select("_id");
      if (found.length !== products.length) {
        return res.status(400).json({
@@ -181,12 +180,25 @@ export const createDeal = async (req, res) => {
      productIds = found.map((p) => p._id);
    }
 
+   // Validate category IDs
+   let categoryIds = [];
+   if (hasCategories) {
+     const found = await Category.find({ _id: { $in: categories } }).select("_id");
+     if (found.length !== categories.length) {
+       return res.status(400).json({
+         status: "error",
+         message: "One or more category IDs are invalid",
+       });
+     }
+     categoryIds = found.map((c) => c._id);
+   }
 
    const deal = await Deal.create({
      title: title.trim(),
      description: description?.trim() || "",
      bannerImage: bannerImage || "",
      products: productIds,
+     categories: categoryIds,
      discountType,
      discountValue: value,
      startsAt: startDate,
@@ -194,9 +206,10 @@ export const createDeal = async (req, res) => {
      isActive: isActive !== undefined ? isActive : true,
    });
 
-
-   await deal.populate("products", "name images basePrice discountedPrice");
-
+   await deal.populate([
+     { path: "products",   select: "name images basePrice discountedPrice" },
+     { path: "categories", select: "name image slug" },
+   ]);
 
    return res.status(201).json({
      status: "success",
@@ -210,7 +223,9 @@ export const createDeal = async (req, res) => {
 };
 
 
-// update deals api 
+/* ─────────────────────────────────────────────────────────────────
+  PATCH /api/v1/deals/update/:dealId
+───────────────────────────────────────────────────────────────────*/
 export const updateDeal = async (req, res) => {
  try {
    const { dealId } = req.params;
@@ -219,6 +234,7 @@ export const updateDeal = async (req, res) => {
      description,
      bannerImage,
      products,
+     categories,
      discountType,
      discountValue,
      startsAt,
@@ -226,14 +242,11 @@ export const updateDeal = async (req, res) => {
      isActive,
    } = req.body;
 
-
    const deal = await Deal.findById(dealId);
    if (!deal) {
      return res.status(404).json({ status: "error", message: "Deal not found" });
    }
 
-
-   // Validate and apply only provided fields
    if (discountType !== undefined) {
      if (!["percentage", "fixed"].includes(discountType)) {
        return res.status(400).json({
@@ -243,7 +256,6 @@ export const updateDeal = async (req, res) => {
      }
      deal.discountType = discountType;
    }
-
 
    if (discountValue !== undefined) {
      const value = parseFloat(discountValue);
@@ -263,7 +275,6 @@ export const updateDeal = async (req, res) => {
      deal.discountValue = value;
    }
 
-
    if (startsAt !== undefined) {
      const d = new Date(startsAt);
      if (isNaN(d)) return res.status(400).json({ status: "error", message: "Invalid startsAt date" });
@@ -281,7 +292,7 @@ export const updateDeal = async (req, res) => {
      });
    }
 
-
+   // Update products if provided
    if (products !== undefined) {
      if (Array.isArray(products) && products.length > 0) {
        const found = await Product.find({ _id: { $in: products } }).select("_id");
@@ -297,16 +308,32 @@ export const updateDeal = async (req, res) => {
      }
    }
 
+   // Update categories if provided
+   if (categories !== undefined) {
+     if (Array.isArray(categories) && categories.length > 0) {
+       const found = await Category.find({ _id: { $in: categories } }).select("_id");
+       if (found.length !== categories.length) {
+         return res.status(400).json({
+           status: "error",
+           message: "One or more category IDs are invalid",
+         });
+       }
+       deal.categories = found.map((c) => c._id);
+     } else {
+       deal.categories = [];
+     }
+   }
 
-   if (title !== undefined) deal.title = title.trim();
+   if (title       !== undefined) deal.title       = title.trim();
    if (description !== undefined) deal.description = description.trim();
    if (bannerImage !== undefined) deal.bannerImage = bannerImage;
-   if (isActive !== undefined) deal.isActive = isActive;
-
+   if (isActive    !== undefined) deal.isActive    = isActive;
 
    await deal.save();
-   await deal.populate("products", "name images basePrice discountedPrice");
-
+   await deal.populate([
+     { path: "products",   select: "name images basePrice discountedPrice" },
+     { path: "categories", select: "name image slug" },
+   ]);
 
    return res.status(200).json({
      status: "success",
@@ -320,12 +347,13 @@ export const updateDeal = async (req, res) => {
 };
 
 
-// update deals status api 
+/* ─────────────────────────────────────────────────────────────────
+  PATCH /api/v1/deals/toggle-status/:dealId
+───────────────────────────────────────────────────────────────────*/
 export const toggleDealStatus = async (req, res) => {
  try {
    const { dealId } = req.params;
    const { isActive } = req.body;
-
 
    if (typeof isActive !== "boolean") {
      return res.status(400).json({
@@ -334,18 +362,17 @@ export const toggleDealStatus = async (req, res) => {
      });
    }
 
-
    const updated = await Deal.findByIdAndUpdate(
      dealId,
      { isActive },
      { new: true }
-   ).populate("products", "name images basePrice discountedPrice");
-
+   )
+     .populate("products",   "name images basePrice discountedPrice")
+     .populate("categories", "name image slug");
 
    if (!updated) {
      return res.status(404).json({ status: "error", message: "Deal not found" });
    }
-
 
    return res.status(200).json({
      status: "success",
@@ -359,7 +386,9 @@ export const toggleDealStatus = async (req, res) => {
 };
 
 
-// delet deals api
+/* ─────────────────────────────────────────────────────────────────
+  DELETE /api/v1/deals/delete/:dealId
+───────────────────────────────────────────────────────────────────*/
 export const deleteDeal = async (req, res) => {
  try {
    const { dealId } = req.params;
@@ -377,7 +406,3 @@ export const deleteDeal = async (req, res) => {
    return res.status(500).json({ status: "error", message: "Error deleting deal" });
  }
 };
-
-
-
-

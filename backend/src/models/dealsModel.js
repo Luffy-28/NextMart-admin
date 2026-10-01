@@ -16,10 +16,19 @@ const dealSchema = new mongoose.Schema(
       type: String,
     },
 
+    // Individual products included in this deal
     products: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Product",
+      },
+    ],
+
+    // Whole categories included in this deal (all products in category get the discount)
+    categories: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Category",
       },
     ],
 
