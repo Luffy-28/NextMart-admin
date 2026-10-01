@@ -47,4 +47,7 @@ export const config = {
     geminai:{
     geminiApiKey: process.env.GEMINI_API_KEY,
   },
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY,
+  },
 };

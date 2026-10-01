@@ -17,6 +17,7 @@ import dashboardRouter from "./src/routers/dashboardRouter.js";
 import dealManagementRouter from "./src/routers/dealsManagementRouter.js";
 import subCategoryManagementRouter from "./src/routers/subcategoryManagementRouter.js";
 import orderManagementRouter from "./src/routers/orderManagementRouter.js";
+import refundManagementRouter from "./src/routers/refundManagementRouter.js";
 
 configDotenv();
 
@@ -47,6 +48,7 @@ app.use("/api/v1/dashboard", dashboardRouter);
 app.use("/api/v1/deals", dealManagementRouter);
 app.use("/api/v1/sub-category", subCategoryManagementRouter);
 app.use("/api/v1/orders", orderManagementRouter);
+app.use("/api/v1/refunds", refundManagementRouter);
 const startServer = async () => {
   try {
     await mongoose.connect(mongourl);

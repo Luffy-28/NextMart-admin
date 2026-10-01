@@ -1,583 +1,657 @@
-import React, { useState, useMemo } from 'react';
-import StatusBadge from '../components/ui/StatusBadge';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchAllRefunds, processRefund } from '../features/refund/refundAction';
 import Modal from '../components/ui/Modal';
-import MetricCard from '../components/ui/MetricCard';
-
-/* ─────────────────────────────────────────────────────────────
-  Refund workflow (mapped to orderModel):
-    1. Order must be "delivered" + paymentStatus "paid"
-    2. Customer raises a refund request → refundStatus: "requested"
-    3. Admin reviews → "approved" or "rejected"
-    4. Only after "approved" → paymentStatus becomes "refunded"
-       and orderStatus becomes "returned"
-─────────────────────────────────────────────────────────────── */
-const INIT_REFUNDS = [
-  {
-    id: 'rf1',
-    orderNumber: 'ORD-94821',
-    requestedAt: 'Jun 20, 2026 · 10:14 AM',
-    user: { name: 'Alex Morgan',   email: 'alex.m@example.com',  initials: 'AM', phone: '+1 555-001-2345' },
-    items: [
-      { name: 'Vapor Ultra Running Shoes', color: 'Black', size: '10', price: 129.99, quantity: 1, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=60&h=60&fit=crop' },
-      { name: 'Chronos Smartwatch Gen 5',  color: 'Space Gray', size: '44mm', price: 299.00, quantity: 1, image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=60&h=60&fit=crop' },
-    ],
-    totalAmount: 481.89,
-    refundAmount: 481.89,
-    reason: 'defective_item',
-    reasonDetail: 'The smartwatch screen developed a dead pixel within 24 hours of delivery. The running shoes also had a manufacturing defect on the sole.',
-    refundStatus: 'requested',
-    adminNote: '',
-    paymentMethod: 'card',
-    deliveredAt: 'Jun 23, 2026',
-    evidence: [
-      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=120&h=120&fit=crop',
-      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=120&h=120&fit=crop',
-    ],
-  },
-  {
-    id: 'rf2',
-    orderNumber: 'ORD-94816',
-    requestedAt: 'Jun 19, 2026 · 03:42 PM',
-    user: { name: 'Emma Wilson',   email: 'emma.w@mail.org',     initials: 'EW', phone: '+1 555-988-7654' },
-    items: [
-      { name: 'Chronos Smartwatch Gen 5', color: 'Silver', size: '40mm', price: 299.00, quantity: 1, image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=60&h=60&fit=crop' },
-    ],
-    totalAmount: 338.90,
-    refundAmount: 299.00,
-    reason: 'wrong_item',
-    reasonDetail: 'I received the 44mm size instead of the 40mm I ordered. The packaging was correct but the item inside was wrong.',
-    refundStatus: 'requested',
-    adminNote: '',
-    paymentMethod: 'card',
-    deliveredAt: 'Jun 18, 2026',
-    evidence: [],
-  },
-  {
-    id: 'rf3',
-    orderNumber: 'ORD-94810',
-    requestedAt: 'Jun 18, 2026 · 11:05 AM',
-    user: { name: 'David Park',    email: 'david.p@work.net',    initials: 'DP', phone: '+1 555-321-6789' },
-    items: [
-      { name: 'AeroDry Hoodie Pro', color: 'Charcoal', size: 'XL', price: 79.99, quantity: 2, image: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=60&h=60&fit=crop' },
-    ],
-    totalAmount: 172.98,
-    refundAmount: 172.98,
-    reason: 'not_as_described',
-    reasonDetail: 'The product color looks completely different from the website photos — it is green not charcoal. Very misleading.',
-    refundStatus: 'approved',
-    adminNote: 'Verified with warehouse — batch had incorrect color label. Full refund approved.',
-    paymentMethod: 'paypal',
-    deliveredAt: 'Jun 17, 2026',
-    evidence: ['https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=120&h=120&fit=crop'],
-    approvedAt: 'Jun 19, 2026 · 09:30 AM',
-  },
-  {
-    id: 'rf4',
-    orderNumber: 'ORD-94805',
-    requestedAt: 'Jun 17, 2026 · 02:15 PM',
-    user: { name: 'Rachel Gomez',  email: 'rachel.g@inbox.net',  initials: 'RG', phone: '+1 555-654-3210' },
-    items: [
-      { name: 'Apex Bluetooth Earbuds', color: 'White', size: null, price: 119.50, quantity: 1, image: 'https://images.unsplash.com/photo-1606220838315-056192d5e927?w=60&h=60&fit=crop' },
-    ],
-    totalAmount: 130.45,
-    refundAmount: 119.50,
-    reason: 'changed_mind',
-    reasonDetail: 'Decided I prefer over-ear headphones. No issues with the product itself.',
-    refundStatus: 'rejected',
-    adminNote: 'Policy: Changed-mind refunds are not accepted for electronics after 7-day return window. Customer was informed.',
-    paymentMethod: 'card',
-    deliveredAt: 'Jun 10, 2026',
-    evidence: [],
-    rejectedAt: 'Jun 18, 2026 · 11:00 AM',
-  },
-  {
-    id: 'rf5',
-    orderNumber: 'ORD-94800',
-    requestedAt: 'Jun 16, 2026 · 08:50 AM',
-    user: { name: 'Chris Tanaka',  email: 'chris.t@email.com',   initials: 'CT', phone: '+1 555-741-8523' },
-    items: [
-      { name: 'Vapor Ultra Running Shoes', color: 'White', size: '11', price: 149.99, quantity: 1, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=60&h=60&fit=crop' },
-    ],
-    totalAmount: 164.99,
-    refundAmount: 164.99,
-    reason: 'defective_item',
-    reasonDetail: 'Sole started separating from the upper after first use on a dry track. Clear manufacturing defect.',
-    refundStatus: 'refunded',
-    adminNote: 'Confirmed defect. Refund processed to original card. Replacement offer declined by customer.',
-    paymentMethod: 'card',
-    deliveredAt: 'Jun 14, 2026',
-    evidence: ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=120&h=120&fit=crop'],
-    approvedAt: 'Jun 17, 2026 · 10:00 AM',
-    refundedAt:  'Jun 17, 2026 · 10:05 AM',
-  },
-];
-
-const REASON_LABELS = {
-  defective_item:  'Defective / Damaged Item',
-  wrong_item:      'Wrong Item Received',
-  not_as_described:'Not as Described',
-  changed_mind:    'Changed Mind',
-  late_delivery:   'Late Delivery',
-  other:           'Other',
-};
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 const STATUS_META = {
-  requested: { label: 'Awaiting Review', color: '#ca8a04', bg: '#fef9c3', icon: 'hourglass_top' },
-  approved:  { label: 'Approved',        color: '#2563eb', bg: '#dbeafe', icon: 'thumb_up'     },
-  rejected:  { label: 'Rejected',        color: '#dc2626', bg: '#fee2e2', icon: 'thumb_down'   },
-  refunded:  { label: 'Refunded',        color: '#16a34a', bg: '#dcfce7', icon: 'currency_exchange' },
+  pending:  { label: 'Awaiting Review', color: '#ca8a04', bg: '#fef9c3', icon: 'hourglass_top' },
+  approved: { label: 'Full Refund',     color: '#16a34a', bg: '#dcfce7', icon: 'check_circle' },
+  partial:  { label: 'Partial Refund',  color: '#2563eb', bg: '#dbeafe', icon: 'pie_chart' },
+  rejected: { label: 'Rejected',        color: '#dc2626', bg: '#fee2e2', icon: 'cancel' },
 };
 
-const PAY_ICON = { card: 'credit_card', paypal: 'account_balance_wallet', cod: 'local_shipping' };
-
-const TABS = ['requested', 'approved', 'rejected', 'refunded'];
+const TABS = ['all', 'pending', 'approved', 'partial', 'rejected'];
 
 const Refunds = () => {
-  const [refunds, setRefunds] = useState(INIT_REFUNDS);
-  const [tab, setTab]         = useState('requested');
-  const [modal, setModal]     = useState(null); // null | 'review' | 'confirm-approve' | 'confirm-reject'
-  const [selected, setSelected] = useState(null);
-  const [adminNote, setAdminNote] = useState('');
-  const [partialAmt, setPartialAmt] = useState('');
+  const dispatch = useDispatch();
+  const { refunds = [], counts = {}, loading } = useSelector((state) => state.refundStore);
 
-  const visible = useMemo(() =>
-    refunds.filter(r => r.refundStatus === tab),
-  [refunds, tab]);
+  const [tab, setTab]             = useState('all');
+  const [modal, setModal]         = useState(null); // null | 'review' | 'image-preview'
+  const [selected, setSelected]   = useState(null);
+  const [previewImg, setPreviewImg] = useState('');
+  const [actionType, setActionType] = useState('approve'); // 'approve' | 'partial' | 'reject'
+  const [refundAmount, setRefundAmount] = useState('');
+  const [adminNote, setAdminNote]   = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback]     = useState({ message: '', type: '' });
 
-  const openReview = (r) => {
-    setSelected(r);
-    setAdminNote(r.adminNote || '');
-    setPartialAmt(r.refundAmount.toString());
+  useEffect(() => {
+    dispatch(fetchAllRefunds());
+  }, [dispatch]);
+
+  const visible = useMemo(() => {
+    if (tab === 'all') return refunds;
+    return refunds.filter((r) => r.status === tab);
+  }, [refunds, tab]);
+
+  const openReview = (reqItem) => {
+    setSelected(reqItem);
+    setActionType('approve');
+    const orderTotal = reqItem.order?.totalAmount || 0;
+    setRefundAmount(orderTotal.toString());
+    setAdminNote('');
+    setFeedback({ message: '', type: '' });
     setModal('review');
   };
 
-  const doApprove = () => {
-    setRefunds(prev => prev.map(r => r.id === selected.id ? {
-      ...r,
-      refundStatus: 'approved',
-      refundAmount: parseFloat(partialAmt) || r.refundAmount,
-      adminNote,
-      approvedAt: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-    } : r));
-    setModal(null);
+  const handleActionChange = (newAction) => {
+    setActionType(newAction);
+    const orderTotal = selected?.order?.totalAmount || 0;
+    if (newAction === 'approve') {
+      setRefundAmount(orderTotal.toString());
+    } else if (newAction === 'partial') {
+      setRefundAmount((orderTotal / 2).toFixed(2));
+    } else {
+      setRefundAmount('0');
+    }
   };
 
-  const doReject = () => {
-    setRefunds(prev => prev.map(r => r.id === selected.id ? {
-      ...r,
-      refundStatus: 'rejected',
-      adminNote,
-      rejectedAt: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-    } : r));
-    setModal(null);
+  const handleSubmitDecision = async () => {
+    if (!adminNote.trim()) {
+      setFeedback({ message: 'Please provide an admin note explaining your decision.', type: 'error' });
+      return;
+    }
+
+    if (actionType === 'partial') {
+      const amt = parseFloat(refundAmount);
+      const total = selected?.order?.totalAmount || 0;
+      if (isNaN(amt) || amt <= 0 || amt > total) {
+        setFeedback({
+          message: `Please enter a valid partial refund amount between $0.01 and $${total.toFixed(2)}.`,
+          type: 'error',
+        });
+        return;
+      }
+    }
+
+    try {
+      setSubmitting(true);
+      const payload = {
+        action: actionType,
+        adminNote: adminNote.trim(),
+        refundAmount: actionType === 'partial' ? parseFloat(refundAmount) : undefined,
+      };
+
+      const res = await dispatch(processRefund(selected._id, payload));
+      if (res && res.status === 'success') {
+        setModal(null);
+      } else {
+        setFeedback({ message: res?.message || 'Failed to process refund request', type: 'error' });
+      }
+    } catch (err) {
+      setFeedback({ message: err.message || 'Error occurred', type: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  /* Process refund — only available after "approved" */
-  const doProcessRefund = (id) => {
-    if (!window.confirm('Process this refund? This action marks the payment as refunded and cannot be undone.')) return;
-    setRefunds(prev => prev.map(r => r.id === id ? {
-      ...r,
-      refundStatus: 'refunded',
-      refundedAt: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-    } : r));
-  };
-
-  /* Stats */
-  const stats = {
-    requested: refunds.filter(r => r.refundStatus === 'requested').length,
-    approved:  refunds.filter(r => r.refundStatus === 'approved').length,
-    rejected:  refunds.filter(r => r.refundStatus === 'rejected').length,
-    refunded:  refunds.filter(r => r.refundStatus === 'refunded').length,
-    totalRefunded: refunds.filter(r => r.refundStatus === 'refunded').reduce((a, r) => a + r.refundAmount, 0),
-  };
-
-  const RefundCard = ({ r }) => {
-    const sm = STATUS_META[r.refundStatus];
-    return (
-      <div style={{
-        background: 'var(--surface-container-lowest)',
-        border: '1px solid var(--outline-variant)',
-        borderRadius: 12,
-        overflow: 'hidden',
-        transition: 'box-shadow 0.2s',
-      }} className="nm-card">
-        {/* Coloured top bar */}
-        <div style={{ height: 4, background: sm.color }} />
-
-        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Header row */}
-          <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
-            <div>
-              <div className="d-flex align-items-center gap-2 mb-1">
-                <span className="nm-text-code">{r.orderNumber}</span>
-                <span className="nm-badge" style={{ background: sm.bg, color: sm.color }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{sm.icon}</span>
-                  {sm.label}
-                </span>
-              </div>
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--secondary)' }}>
-                Requested: {r.requestedAt}
-              </p>
-            </div>
-            {/* Refund amount */}
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'var(--font-mono)', color: 'var(--primary-container)' }}>
-                ${r.refundAmount.toFixed(2)}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--secondary)' }}>
-                of ${r.totalAmount.toFixed(2)} order total
-              </div>
-            </div>
-          </div>
-
-          {/* Customer + order summary */}
-          <div className="row g-3">
-            <div className="col-md-5">
-              <div style={{ padding: '12px 14px', background: 'var(--surface-container-low)', borderRadius: 8 }}>
-                <p className="nm-label" style={{ marginBottom: 6 }}>Customer</p>
-                <div className="d-flex align-items-center gap-2">
-                  <span className="nm-avatar-initials">{r.user.initials}</span>
-                  <div>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>{r.user.name}</p>
-                    <p style={{ margin: 0, fontSize: 12, color: 'var(--secondary)' }}>{r.user.email}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-3">
-              <div style={{ padding: '12px 14px', background: 'var(--surface-container-low)', borderRadius: 8 }}>
-                <p className="nm-label" style={{ marginBottom: 6 }}>Delivered</p>
-                <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>{r.deliveredAt}</p>
-              </div>
-            </div>
-            <div className="col-md-4">
-              <div style={{ padding: '12px 14px', background: 'var(--surface-container-low)', borderRadius: 8 }}>
-                <p className="nm-label" style={{ marginBottom: 6 }}>Payment Method</p>
-                <div className="d-flex align-items-center gap-2">
-                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--secondary)' }}>{PAY_ICON[r.paymentMethod]}</span>
-                  <span style={{ fontWeight: 600, fontSize: 13, textTransform: 'capitalize' }}>{r.paymentMethod}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Items */}
-          <div>
-            <p className="nm-label" style={{ marginBottom: 8 }}>Items in Order</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {r.items.map((item, i) => (
-                <div key={i} className="d-flex align-items-center gap-3" style={{
-                  padding: '8px 12px', background: 'var(--surface-container-lowest)',
-                  border: '1px solid var(--outline-variant)', borderRadius: 8
-                }}>
-                  <img src={item.image} alt={item.name} style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontWeight: 600, fontSize: 14 }}>{item.name}</span>
-                    {(item.color || item.size) && (
-                      <span style={{ fontSize: 12, color: 'var(--secondary)', marginLeft: 8 }}>
-                        {[item.color, item.size].filter(Boolean).join(' / ')}
-                      </span>
-                    )}
-                  </div>
-                  <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                    ×{item.quantity} · ${(item.price * item.quantity).toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Reason */}
-          <div style={{
-            padding: '12px 16px', borderRadius: 8,
-            background: r.refundStatus === 'rejected' ? 'rgba(186,26,26,0.04)' : 'var(--surface-container-low)',
-            borderLeft: `4px solid ${r.refundStatus === 'rejected' ? 'var(--error)' : 'var(--outline-variant)'}`,
-          }}>
-            <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--secondary)' }}>
-              Reason: {REASON_LABELS[r.reason] || r.reason}
-            </p>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>"{r.reasonDetail}"</p>
-          </div>
-
-          {/* Evidence images */}
-          {r.evidence?.length > 0 && (
-            <div>
-              <p className="nm-label" style={{ marginBottom: 8 }}>Evidence / Photos</p>
-              <div className="d-flex gap-2 flex-wrap">
-                {r.evidence.map((img, i) => (
-                  <img key={i} src={img} alt={`evidence-${i}`} style={{
-                    width: 80, height: 80, borderRadius: 8, objectFit: 'cover',
-                    border: '1px solid var(--outline-variant)', cursor: 'zoom-in'
-                  }} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Admin note (if exists) */}
-          {r.adminNote && (
-            <div style={{
-              padding: '12px 16px', borderRadius: 8,
-              background: r.refundStatus === 'approved' || r.refundStatus === 'refunded' ? '#dbeafe' : '#fee2e2',
-              borderLeft: `4px solid ${r.refundStatus === 'approved' || r.refundStatus === 'refunded' ? '#2563eb' : 'var(--error)'}`,
-            }}>
-              <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--secondary)' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 4 }}>admin_panel_settings</span>
-                Admin Note
-              </p>
-              <p style={{ margin: 0, fontSize: 13, fontStyle: 'italic' }}>{r.adminNote}</p>
-              {r.approvedAt && <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--secondary)' }}>Approved: {r.approvedAt}</p>}
-              {r.rejectedAt && <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--secondary)' }}>Rejected: {r.rejectedAt}</p>}
-              {r.refundedAt  && <p style={{ margin: '4px 0 0', fontSize: 11, color: '#16a34a', fontWeight: 700 }}>✓ Refund processed: {r.refundedAt}</p>}
-            </div>
-          )}
-
-          {/* Action row */}
-          <div className="d-flex justify-content-end gap-2" style={{ borderTop: '1px solid var(--outline-variant)', paddingTop: 14 }}>
-            {/* Pending → Review button */}
-            {r.refundStatus === 'requested' && (
-              <>
-                <button className="nm-btn nm-btn-danger nm-btn-sm" onClick={() => openReview(r)}>
-                  <span className="material-symbols-outlined">thumb_down</span> Reject
-                </button>
-                <button className="nm-btn nm-btn-primary nm-btn-sm" onClick={() => openReview(r)}>
-                  <span className="material-symbols-outlined">rate_review</span> Review Request
-                </button>
-              </>
-            )}
-            {/* Approved → Process Refund button */}
-            {r.refundStatus === 'approved' && (
-              <button
-                className="nm-btn nm-btn-primary nm-btn-sm"
-                style={{ background: '#16a34a' }}
-                onClick={() => doProcessRefund(r.id)}
-              >
-                <span className="material-symbols-outlined">currency_exchange</span>
-                Process Refund (${r.refundAmount.toFixed(2)})
-              </button>
-            )}
-            {/* Refunded — badge only */}
-            {r.refundStatus === 'refunded' && (
-              <span className="nm-badge nm-badge-success" style={{ padding: '8px 16px', fontSize: 13 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
-                Refund Processed
-              </span>
-            )}
-            {/* Rejected */}
-            {r.refundStatus === 'rejected' && (
-              <span className="nm-badge nm-badge-danger" style={{ padding: '8px 16px', fontSize: 13 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>block</span>
-                Request Rejected
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const totalRefundedSum = useMemo(() => {
+    return refunds
+      .filter((r) => r.status === 'approved' || r.status === 'partial')
+      .reduce((sum, r) => sum + (r.refundAmount || 0), 0);
+  }, [refunds]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Page header */}
+      {/* Page Header */}
       <div className="nm-page-header">
         <div>
-          <h2 className="nm-page-title">Refund Requests</h2>
+          <h2 className="nm-page-title">Refund & Return Management</h2>
           <p className="nm-page-subtitle">
-            Review customer refund requests. Approve to unlock processing — refunds are only processed after explicit approval.
+            Review customer cancellation and item return requests. Inspect customer evidence, determine item condition, and issue full or partial refunds.
           </p>
         </div>
       </div>
 
-      {/* Approval flow banner */}
-      <div style={{
-        padding: '14px 20px', background: 'rgba(37,99,235,0.06)',
-        border: '1px solid rgba(37,99,235,0.2)', borderRadius: 10,
-        display: 'flex', alignItems: 'flex-start', gap: 12,
-      }}>
-        <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 22, flexShrink: 0, marginTop: 1 }}>info</span>
-        <div>
-          <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 14, color: '#1e40af' }}>Two-Step Approval Policy</p>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--secondary)', lineHeight: 1.6 }}>
-            <strong>Step 1:</strong> Review the customer's request and evidence, set the refund amount, and <strong>Approve</strong> or <strong>Reject</strong>. &nbsp;
-            <strong>Step 2:</strong> Only after approval, click <strong>Process Refund</strong> to finalize the payment reversal. Refunds are only valid for orders with <em>delivered</em> status.
-          </p>
-        </div>
-      </div>
-
-      {/* Stats */}
+      {/* Metrics Row */}
       <div className="row g-4">
         <div className="col-6 col-xl-3">
           <div className="nm-metric-card" style={{ borderColor: 'rgba(202,138,4,0.3)' }}>
             <div className="nm-metric-label">Awaiting Review</div>
-            <div className="nm-metric-value" style={{ marginTop: 8, color: stats.requested > 0 ? '#ca8a04' : 'var(--on-surface)' }}>{stats.requested}</div>
-            <div className="nm-metric-sub">Need admin decision</div>
+            <div className="nm-metric-value" style={{ marginTop: 8, color: (counts.pending || 0) > 0 ? '#ca8a04' : 'var(--on-surface)' }}>
+              {counts.pending || 0}
+            </div>
+            <div className="nm-metric-sub">Pending admin decisions</div>
+          </div>
+        </div>
+        <div className="col-6 col-xl-3">
+          <div className="nm-metric-card" style={{ borderColor: 'rgba(22,163,74,0.3)' }}>
+            <div className="nm-metric-label">Full Refunds Approved</div>
+            <div className="nm-metric-value" style={{ marginTop: 8, color: '#16a34a' }}>
+              {counts.approved || 0}
+            </div>
+            <div className="nm-metric-sub">100% reimbursed</div>
           </div>
         </div>
         <div className="col-6 col-xl-3">
           <div className="nm-metric-card" style={{ borderColor: 'rgba(37,99,235,0.3)' }}>
-            <div className="nm-metric-label">Approved — Pending Payout</div>
-            <div className="nm-metric-value" style={{ marginTop: 8, color: '#2563eb' }}>{stats.approved}</div>
-            <div className="nm-metric-sub">Ready to process</div>
+            <div className="nm-metric-label">Partial Refunds Approved</div>
+            <div className="nm-metric-value" style={{ marginTop: 8, color: '#2563eb' }}>
+              {counts.partial || 0}
+            </div>
+            <div className="nm-metric-sub">Condition-based payouts</div>
           </div>
         </div>
         <div className="col-6 col-xl-3">
           <div className="nm-metric-card">
-            <div className="nm-metric-label">Total Refunded (All Time)</div>
-            <div className="nm-metric-value" style={{ marginTop: 8 }}>${stats.totalRefunded.toFixed(2)}</div>
-            <div className="nm-metric-sub">From {stats.refunded} completed refunds</div>
-          </div>
-        </div>
-        <div className="col-6 col-xl-3">
-          <div className="nm-metric-card" style={{ borderColor: 'rgba(186,26,26,0.2)' }}>
-            <div className="nm-metric-label">Rejected</div>
-            <div className="nm-metric-value" style={{ marginTop: 8, color: 'var(--error)' }}>{stats.rejected}</div>
-            <div className="nm-metric-sub">Requests denied</div>
+            <div className="nm-metric-label">Total Amount Refunded</div>
+            <div className="nm-metric-value" style={{ marginTop: 8 }}>
+              ${totalRefundedSum.toFixed(2)}
+            </div>
+            <div className="nm-metric-sub">{counts.rejected || 0} requests rejected</div>
           </div>
         </div>
       </div>
 
-      {/* Status Tabs */}
+      {/* Filter Tabs */}
       <div className="nm-tabs">
-        {TABS.map(t => {
-          const sm = STATUS_META[t];
-          const count = refunds.filter(r => r.refundStatus === t).length;
+        {TABS.map((t) => {
+          const count = t === 'all' ? refunds.length : counts[t] || 0;
           return (
-            <button key={t} className={`nm-tab-btn${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
-              <span className="material-symbols-outlined" style={{ fontSize: 15, verticalAlign: 'middle', marginRight: 5 }}>{sm.icon}</span>
-              {sm.label}
+            <button
+              key={t}
+              className={`nm-tab-btn${tab === t ? ' active' : ''}`}
+              onClick={() => setTab(t)}
+            >
+              {t === 'all' ? 'All Requests' : STATUS_META[t]?.label || t}
               {count > 0 && (
-                <span className="ms-2 nm-badge" style={{ background: sm.bg, color: sm.color }}>{count}</span>
+                <span
+                  className="ms-2 nm-badge"
+                  style={{
+                    background: t === 'all' ? 'var(--surface-container-high)' : STATUS_META[t]?.bg,
+                    color: t === 'all' ? 'var(--on-surface)' : STATUS_META[t]?.color,
+                  }}
+                >
+                  {count}
+                </span>
               )}
             </button>
           );
         })}
       </div>
 
-      {/* Cards */}
-      {visible.length === 0 ? (
+      {/* Loading state */}
+      {loading && refunds.length === 0 ? (
+        <div className="nm-card d-flex justify-content-center p-5">
+          <LoadingSpinner />
+        </div>
+      ) : visible.length === 0 ? (
         <div className="nm-card">
           <div className="nm-empty-state">
             <span className="material-symbols-outlined">currency_exchange</span>
-            <h4 style={{ fontWeight: 700, margin: '0 0 8px', fontSize: 16 }}>No {STATUS_META[tab].label} requests</h4>
-            <p style={{ margin: 0, fontSize: 13 }}>There are no refund requests in this status right now.</p>
+            <h4 style={{ fontWeight: 700, margin: '0 0 8px', fontSize: 16 }}>No requests found</h4>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--secondary)' }}>
+              There are currently no refund or return requests in this category.
+            </p>
           </div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {visible.map(r => <RefundCard key={r.id} r={r} />)}
+          {visible.map((reqItem) => {
+            const sm = STATUS_META[reqItem.status] || STATUS_META.pending;
+            const isReturn = reqItem.type === 'return';
+            const order = reqItem.order || {};
+            const user = reqItem.user || {};
+
+            return (
+              <div
+                key={reqItem._id}
+                style={{
+                  background: 'var(--surface-container-lowest)',
+                  border: '1px solid var(--outline-variant)',
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  transition: 'box-shadow 0.2s',
+                }}
+                className="nm-card"
+              >
+                {/* Colored Top Bar */}
+                <div style={{ height: 4, background: sm.color }} />
+
+                <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Header Row */}
+                  <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                    <div>
+                      <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                        <span className="nm-text-code" style={{ fontSize: 14 }}>
+                          Order #{order.orderNumber || 'N/A'}
+                        </span>
+                        <span
+                          className="nm-badge"
+                          style={{
+                            background: isReturn ? '#ede9fe' : '#e0f2fe',
+                            color: isReturn ? '#7c3aed' : '#0284c7',
+                            fontWeight: 700,
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 13, marginRight: 3 }}>
+                            {isReturn ? 'assignment_return' : 'cancel'}
+                          </span>
+                          {isReturn ? 'Return Request' : 'Order Cancellation'}
+                        </span>
+                        <span className="nm-badge" style={{ background: sm.bg, color: sm.color }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 13, marginRight: 3 }}>
+                            {sm.icon}
+                          </span>
+                          {sm.label}
+                        </span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--secondary)' }}>
+                        Submitted on {new Date(reqItem.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+
+                    {/* Amount info */}
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'var(--font-mono)', color: 'var(--primary-container)' }}>
+                        {reqItem.status === 'pending'
+                          ? `$${(order.totalAmount || 0).toFixed(2)}`
+                          : `$${(reqItem.refundAmount || 0).toFixed(2)}`}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--secondary)' }}>
+                        {reqItem.status === 'pending'
+                          ? `Order Total: $${(order.totalAmount || 0).toFixed(2)}`
+                          : `Refunded out of $${(order.totalAmount || 0).toFixed(2)}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Customer and Order Summary */}
+                  <div className="row g-3">
+                    <div className="col-md-5">
+                      <div style={{ padding: '12px 14px', background: 'var(--surface-container-low)', borderRadius: 8 }}>
+                        <p className="nm-label" style={{ marginBottom: 4 }}>Customer</p>
+                        <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>{user.name || 'Anonymous'}</p>
+                        <p style={{ margin: 0, fontSize: 12, color: 'var(--secondary)' }}>{user.email || 'No email'}</p>
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div style={{ padding: '12px 14px', background: 'var(--surface-container-low)', borderRadius: 8 }}>
+                        <p className="nm-label" style={{ marginBottom: 4 }}>Payment Method</p>
+                        <p style={{ margin: 0, fontWeight: 600, fontSize: 13, textTransform: 'uppercase' }}>
+                          {order.paymentMethod || 'card'}
+                        </p>
+                        <span style={{ fontSize: 11, color: 'var(--secondary)' }}>
+                          Status: {order.paymentStatus || 'paid'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div style={{ padding: '12px 14px', background: 'var(--surface-container-low)', borderRadius: 8 }}>
+                        <p className="nm-label" style={{ marginBottom: 4 }}>Order Status</p>
+                        <p style={{ margin: 0, fontWeight: 600, fontSize: 13, textTransform: 'capitalize' }}>
+                          {order.orderStatus || 'N/A'}
+                        </p>
+                        <span style={{ fontSize: 11, color: 'var(--secondary)' }}>
+                          {reqItem.stripeRefundId ? `Stripe: ${reqItem.stripeRefundId}` : 'No Stripe ID'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Order Items Preview */}
+                  {order.items && order.items.length > 0 && (
+                    <div>
+                      <p className="nm-label" style={{ marginBottom: 8 }}>Items in Order</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {order.items.map((item, i) => (
+                          <div
+                            key={i}
+                            className="d-flex align-items-center gap-3"
+                            style={{
+                              padding: '8px 12px',
+                              background: 'var(--surface-container-lowest)',
+                              border: '1px solid var(--outline-variant)',
+                              borderRadius: 8,
+                            }}
+                          >
+                            {item.image && (
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }}
+                              />
+                            )}
+                            <div style={{ flex: 1 }}>
+                              <span style={{ fontWeight: 600, fontSize: 13 }}>{item.name}</span>
+                              {(item.color || item.size) && (
+                                <span style={{ fontSize: 11, color: 'var(--secondary)', marginLeft: 8 }}>
+                                  {[item.color, item.size].filter(Boolean).join(' / ')}
+                                </span>
+                              )}
+                            </div>
+                            <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                              ×{item.quantity} · ${(item.price * item.quantity).toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Customer Reason */}
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: 8,
+                      background: 'var(--surface-container-low)',
+                      borderLeft: '4px solid var(--primary)',
+                    }}
+                  >
+                    <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--secondary)' }}>
+                      Customer's Reason for {isReturn ? 'Return' : 'Cancellation'}:
+                    </p>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5 }}>
+                      "{reqItem.reason}"
+                    </p>
+                  </div>
+
+                  {/* Evidence / Photos */}
+                  {reqItem.images && reqItem.images.length > 0 && (
+                    <div>
+                      <p className="nm-label" style={{ marginBottom: 8 }}>
+                        Item Condition Evidence ({reqItem.images.length} photos)
+                      </p>
+                      <div className="d-flex gap-2 flex-wrap">
+                        {reqItem.images.map((imgUrl, i) => (
+                          <img
+                            key={i}
+                            src={imgUrl}
+                            alt={`evidence-${i}`}
+                            style={{
+                              width: 80,
+                              height: 80,
+                              borderRadius: 8,
+                              objectFit: 'cover',
+                              border: '1px solid var(--outline-variant)',
+                              cursor: 'pointer',
+                              transition: 'transform 0.15s ease',
+                            }}
+                            onClick={() => {
+                              setPreviewImg(imgUrl);
+                              setModal('image-preview');
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Admin Note if resolved */}
+                  {reqItem.adminNote && (
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: 8,
+                        background: reqItem.status === 'rejected' ? '#fee2e2' : '#dcfce7',
+                        borderLeft: `4px solid ${reqItem.status === 'rejected' ? 'var(--error)' : '#16a34a'}`,
+                      }}
+                    >
+                      <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--secondary)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 4 }}>
+                          admin_panel_settings
+                        </span>
+                        Admin Note & Assessment
+                      </p>
+                      <p style={{ margin: 0, fontSize: 13, fontStyle: 'italic' }}>
+                        {reqItem.adminNote}
+                      </p>
+                      {reqItem.resolvedAt && (
+                        <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--secondary)' }}>
+                          Decided on: {new Date(reqItem.resolvedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Action Row */}
+                  <div className="d-flex justify-content-end gap-2" style={{ borderTop: '1px solid var(--outline-variant)', paddingTop: 14 }}>
+                    {reqItem.status === 'pending' ? (
+                      <button
+                        className="nm-btn nm-btn-primary nm-btn-sm"
+                        onClick={() => openReview(reqItem)}
+                      >
+                        <span className="material-symbols-outlined">gavel</span>
+                        Review & Process Refund
+                      </button>
+                    ) : (
+                      <span className="nm-badge" style={{ background: sm.bg, color: sm.color, padding: '8px 16px', fontSize: 13 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16, marginRight: 4 }}>
+                          {sm.icon}
+                        </span>
+                        {sm.label} {reqItem.status !== 'rejected' && `($${(reqItem.refundAmount || 0).toFixed(2)})`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* ── Review Modal ─────────────────────────────────── */}
+      {/* ── Review & Decision Modal ────────────────────────────── */}
       <Modal
         isOpen={modal === 'review' && !!selected}
         onClose={() => setModal(null)}
-        title={`Review Refund — ${selected?.orderNumber}`}
-        size="md"
+        title={`Process Refund — Order #${selected?.order?.orderNumber || ''}`}
+        size="lg"
         footer={
           <div className="d-flex justify-content-between w-100">
             <button
-              className="nm-btn nm-btn-danger nm-btn-sm"
-              onClick={doReject}
-              disabled={!adminNote.trim()}
-              title={!adminNote.trim() ? 'Add an admin note before rejecting' : ''}
+              className="nm-btn nm-btn-secondary nm-btn-sm"
+              onClick={() => setModal(null)}
+              disabled={submitting}
             >
-              <span className="material-symbols-outlined">thumb_down</span> Reject Request
+              Cancel
             </button>
             <button
               className="nm-btn nm-btn-primary nm-btn-sm"
-              style={{ background: '#2563eb' }}
-              onClick={doApprove}
-              disabled={!adminNote.trim() || !partialAmt || parseFloat(partialAmt) <= 0}
-              title={!adminNote.trim() ? 'Add an admin note before approving' : ''}
+              style={{
+                background:
+                  actionType === 'approve'
+                    ? '#16a34a'
+                    : actionType === 'partial'
+                    ? '#2563eb'
+                    : '#dc2626',
+              }}
+              onClick={handleSubmitDecision}
+              disabled={submitting}
             >
-              <span className="material-symbols-outlined">thumb_up</span> Approve & Set Amount
+              {submitting ? (
+                'Processing...'
+              ) : (
+                <>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, marginRight: 4 }}>
+                    {actionType === 'reject' ? 'block' : 'check'}
+                  </span>
+                  Confirm {actionType === 'approve' ? 'Full Refund' : actionType === 'partial' ? 'Partial Refund' : 'Rejection'}
+                </>
+              )}
             </button>
           </div>
         }
       >
         {selected && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {/* Order summary */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {feedback.message && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  background: feedback.type === 'error' ? '#fee2e2' : '#dcfce7',
+                  color: feedback.type === 'error' ? '#b91c1c' : '#15803d',
+                }}
+              >
+                {feedback.message}
+              </div>
+            )}
+
+            {/* Request Summary Card */}
             <div style={{ padding: '14px 16px', background: 'var(--surface-container-low)', borderRadius: 10 }}>
               <div className="d-flex justify-content-between align-items-center">
                 <div>
-                  <span className="nm-text-code">{selected.orderNumber}</span>
-                  <p style={{ margin: '4px 0 0', fontWeight: 700, fontSize: 15 }}>{selected.user.name}</p>
-                  <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--secondary)' }}>{selected.user.email}</p>
+                  <span className="nm-text-code">Order #{selected.order?.orderNumber}</span>
+                  <p style={{ margin: '4px 0 0', fontWeight: 700, fontSize: 15 }}>
+                    {selected.user?.name} ({selected.user?.email})
+                  </p>
+                  <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--secondary)' }}>
+                    Type: <strong style={{ textTransform: 'capitalize' }}>{selected.type}</strong>
+                  </p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <p style={{ margin: 0, fontSize: 12, color: 'var(--secondary)' }}>Order Total</p>
-                  <p style={{ margin: 0, fontWeight: 800, fontSize: 18, fontFamily: 'var(--font-mono)' }}>${selected.totalAmount.toFixed(2)}</p>
+                  <p style={{ margin: 0, fontWeight: 800, fontSize: 20, fontFamily: 'var(--font-mono)' }}>
+                    ${(selected.order?.totalAmount || 0).toFixed(2)}
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Reason */}
-            <div style={{ padding: '12px 16px', background: 'var(--surface-container-low)', borderRadius: 8, borderLeft: '4px solid var(--outline-variant)' }}>
-              <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--secondary)' }}>
-                Customer Reason: {REASON_LABELS[selected.reason]}
-              </p>
-              <p style={{ margin: 0, fontSize: 13 }}>"{selected.reasonDetail}"</p>
+            {/* Customer Reason */}
+            <div>
+              <p className="nm-label" style={{ marginBottom: 4 }}>Customer's Explanation</p>
+              <div style={{ padding: '12px 14px', background: 'var(--surface-container-lowest)', border: '1px solid var(--outline-variant)', borderRadius: 8 }}>
+                <p style={{ margin: 0, fontSize: 13 }}>{selected.reason}</p>
+              </div>
             </div>
 
-            {/* Evidence */}
-            {selected.evidence?.length > 0 && (
+            {/* Evidence Photos */}
+            {selected.images && selected.images.length > 0 && (
               <div>
-                <p className="nm-label" style={{ marginBottom: 8 }}>Customer Evidence</p>
+                <p className="nm-label" style={{ marginBottom: 6 }}>
+                  Item Condition Photos (Click to Enlarge)
+                </p>
                 <div className="d-flex gap-2 flex-wrap">
-                  {selected.evidence.map((img, i) => (
-                    <img key={i} src={img} alt={`ev-${i}`} style={{ width: 72, height: 72, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--outline-variant)' }} />
+                  {selected.images.map((img, i) => (
+                    <img
+                      key={i}
+                      src={img}
+                      alt={`ev-${i}`}
+                      style={{
+                        width: 72,
+                        height: 72,
+                        borderRadius: 8,
+                        objectFit: 'cover',
+                        border: '1px solid var(--outline-variant)',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => {
+                        setPreviewImg(img);
+                        setModal('image-preview');
+                      }}
+                    />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Refund amount (editable — allows partial refunds) */}
+            {/* Decision Selector */}
             <div>
-              <label className="nm-label">
-                Refund Amount ($)
-                <span style={{ fontWeight: 400, color: 'var(--secondary)', marginLeft: 6 }}>
-                  (max: ${selected.totalAmount.toFixed(2)} — edit for partial refund)
-                </span>
-              </label>
-              <input
-                type="number" step="0.01" min="0.01" max={selected.totalAmount}
-                className="nm-input"
-                value={partialAmt}
-                onChange={e => setPartialAmt(e.target.value)}
-              />
-              {parseFloat(partialAmt) < selected.refundAmount && (
-                <p style={{ margin: '6px 0 0', fontSize: 11, color: '#ca8a04', fontWeight: 600 }}>
-                  ⚠ Partial refund: customer requested ${selected.refundAmount.toFixed(2)}
-                </p>
-              )}
+              <label className="nm-label mb-2">Select Decision Action</label>
+              <div className="d-flex gap-2">
+                <button
+                  type="button"
+                  className={`nm-btn nm-btn-sm ${actionType === 'approve' ? 'nm-btn-primary' : 'nm-btn-outline'}`}
+                  style={{ flex: 1, background: actionType === 'approve' ? '#16a34a' : 'transparent' }}
+                  onClick={() => handleActionChange('approve')}
+                >
+                  <span className="material-symbols-outlined">check_circle</span>
+                  Full Refund (${(selected.order?.totalAmount || 0).toFixed(2)})
+                </button>
+                <button
+                  type="button"
+                  className={`nm-btn nm-btn-sm ${actionType === 'partial' ? 'nm-btn-primary' : 'nm-btn-outline'}`}
+                  style={{ flex: 1, background: actionType === 'partial' ? '#2563eb' : 'transparent' }}
+                  onClick={() => handleActionChange('partial')}
+                >
+                  <span className="material-symbols-outlined">pie_chart</span>
+                  Partial Refund
+                </button>
+                <button
+                  type="button"
+                  className={`nm-btn nm-btn-sm ${actionType === 'reject' ? 'nm-btn-danger' : 'nm-btn-outline'}`}
+                  style={{ flex: 1 }}
+                  onClick={() => handleActionChange('reject')}
+                >
+                  <span className="material-symbols-outlined">cancel</span>
+                  Reject Request
+                </button>
+              </div>
             </div>
 
-            {/* Admin note (required) */}
+            {/* Partial Amount Input */}
+            {actionType === 'partial' && (
+              <div>
+                <label className="nm-label">
+                  Partial Refund Amount ($) <span style={{ color: 'var(--error)' }}>*</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={selected.order?.totalAmount || 0}
+                    className="nm-input"
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    placeholder="Enter amount based on condition of returned item"
+                  />
+                </div>
+                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--secondary)' }}>
+                  Maximum allowed: ${(selected.order?.totalAmount || 0).toFixed(2)}. This amount will be credited back to the customer.
+                </p>
+              </div>
+            )}
+
+            {/* Admin Assessment / Decision Note */}
             <div>
               <label className="nm-label">
-                Admin Decision Note <span style={{ color: 'var(--error)' }}>*</span>
+                Decision Note & Condition Assessment <span style={{ color: 'var(--error)' }}>*</span>
               </label>
               <textarea
-                className="nm-input" rows={3}
-                placeholder="Required: Explain your decision (e.g. 'Defect confirmed by warehouse. Full refund approved.' or 'Outside 7-day return window.')"
+                className="nm-input"
+                rows={3}
+                placeholder="Explain the decision (e.g., 'Item was returned in mint condition, full refund approved.' or 'Item had signs of wear; 50% partial refund issued as per policy.')"
                 value={adminNote}
-                onChange={e => setAdminNote(e.target.value)}
+                onChange={(e) => setAdminNote(e.target.value)}
                 style={{ resize: 'vertical' }}
               />
-              {!adminNote.trim() && (
-                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--error)' }}>A decision note is required before approving or rejecting.</p>
-              )}
-            </div>
-
-            {/* Warning */}
-            <div style={{ padding: '10px 14px', background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.2)', borderRadius: 8, fontSize: 12, color: '#1e40af' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle', marginRight: 4 }}>lock</span>
-              <strong>Approving</strong> does not immediately transfer funds — you will still need to click <strong>Process Refund</strong> on the approved card. <strong>Rejecting</strong> closes the request permanently.
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--secondary)' }}>
+                This note will be recorded in the system and emailed to the customer.
+              </p>
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* ── Photo Preview Modal ────────────────────────────── */}
+      <Modal
+        isOpen={modal === 'image-preview'}
+        onClose={() => setModal(selected ? 'review' : null)}
+        title="Evidence Image Preview"
+        size="md"
+      >
+        <div style={{ textAlign: 'center' }}>
+          <img
+            src={previewImg}
+            alt="Evidence full size"
+            style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 8, objectFit: 'contain' }}
+          />
+        </div>
       </Modal>
     </div>
   );
